@@ -96,18 +96,82 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
         if RN < 0.5:
             """            INSERTION          """
             N_Insertion += 1
-            x_Insertion = L*(rn.random() - 0.5)
-            y_Insertion = L*(rn.random() - 0.5)
-            z_Insertion = L*(rn.random() - 0.5)
-            Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
-            if rn.random() < m.exp(Beta * (ChemPot - Energy_Insertion) + m.log(V / (len(x) + 1))):
-                N_Insertion_Accepted += 1
-                x.append(x_Insertion)
-                y.append(y_Insertion)
-                z.append(z_Insertion)
-                Energy += Energy_Insertion
-            else:
-                N_Insertion_Rejected += 1
+            grid = 64
+            EVMPS = np.ones((grid, grid, grid))
+            Delta = L / (grid + 1)
+            for i_x in range(0, grid, 1):
+                for i_y in range(0, grid, 1):
+                    for i_z in range(0, grid, 1):
+                        x_grid = (i_x + 1) * Delta - L / 2.
+                        y_grid = (i_y + 1) * Delta - L / 2.
+                        z_grid = (i_z + 1) * Delta - L / 2.
+                        for k in range(0, len(x), 1):
+                            Delta_x = x_grid - x[k]
+                            Delta_y = y_grid - y[k]
+                            Delta_z = z_grid - z[k]
+                            r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                            if r2 < m.pow(0.8, 2):
+                                EVMPS[i_x, i_y, i_z] = 1
+                                break
+            if np.sum(EVMPS) < m.pow(grid, 3):
+                aux1 = np.where(EVMPS == 0)
+                j = rn.randrange(0, len(aux1[0]), 1)
+                i_x = aux1[0][j]
+                i_y = aux1[1][j]
+                i_z = aux1[2][j]
+                x_Insertion = (i_x + 1) * Delta - L / 2.
+                y_Insertion = (i_y + 1) * Delta - L / 2.
+                z_Insertion = (i_z + 1) * Delta - L / 2.
+                Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
+                """     EXCLUDED VOLUME     """
+                V_Excluded = len(x) * (4. / 3.) * m.pi
+                """ CORRECTION DUE TO SPHERE OVERLAPNESS """
+                V_Excluded_Correction = 0
+                for j in range(0, len(x), 1):
+                    for k in range(0, len(x), 1):
+                        if j != k:
+                            Delta_x = x[j] - x[k]
+                            Delta_y = y[j] - y[k]
+                            Delta_z = z[j] - z[k]
+                            r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                            if r2 < 1.0: # r2 < 1 implies overlapness 
+                                d = m.sqrt(r2)
+                                V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
+                            else:
+                                if Delta_x > L - 1.: """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
+                                    Delta_x -= L
+                                if Delta_y > L - 1.:
+                                    Delta_y -= L
+                                if Delta_z > L - 1.:
+                                    Delta_z -= L
+                                r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                                if r2 < 1.0: # r2 < 1 implies overlapness 
+                                    d = m.sqrt(r2)
+                                    V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
+                Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
+                if Volume_Ratio > 1 or Volume_Ratio < 0:
+                    raise ValueError("Volume Ratio (", Volume_Ratio, ") can't be negative nor greater than one.")
+                if rn.random() < (V_Excluded - V_Excluded_Correction)/(len(x) + 1) * m.exp(Beta * (ChemPot - Energy_Insertion))
+                    N_Insertion_Accepted += 1
+                    x.append(x_Insertion)
+                    y.append(y_Insertion)
+                    z.append(z_Insertion)
+                    Energy += Energy_Insertion
+                else:
+                    N_Insertion_Rejected += 1
+            else:        
+                x_Insertion = L*(rn.random() - 0.5)
+                y_Insertion = L*(rn.random() - 0.5)
+                z_Insertion = L*(rn.random() - 0.5)
+                Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
+                if rn.random() < m.exp(Beta * (ChemPot - Energy_Insertion) + m.log(V / (len(x) + 1))):
+                    N_Insertion_Accepted += 1
+                    x.append(x_Insertion)
+                    y.append(y_Insertion)
+                    z.append(z_Insertion)
+                    Energy += Energy_Insertion
+                else:
+                    N_Insertion_Rejected += 1
 
         elif len(x) > 1:
             """            REMOVAL            """
@@ -122,6 +186,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 Energy -= Energy_Removal
             else:
                 N_Removal_Rejected += 1
+
         if i > 0:
             if m.fmod(i, MC_Measurement) == 0:
                 """     COMPUTES AVERAGES    """
@@ -144,9 +209,16 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     print("< E / N > = ", Energy_Sum / N_Measurements)
     print("< Density > = ", N_Sum / (N_Measurements * V))
     print("< N > = ", N_Sum/N_Measurements)
+    print(" ")
     print("Movements: ", N_Movement)
     print("     Accepted: ", N_Movement_Accepted)
     print("     Rejected: ", N_Movement_Rejected)
+    print("Insertions: ", N_Insertion)
+    print("     Accepted: ", N_Insertion_Accepted)
+    print("     Rejected: ", N_Insertion_Rejected)
+    print("Removal: ", N_Removal)
+    print("     Accepted: ", N_Removal_Accepted)
+    print("     Rejected: ", N_Removal_Rejected)
                 
 
 def u(r2):
