@@ -15,8 +15,8 @@ import numpy as np
     
 def Mezei(ChemPot, V, T, R_Cut = 3.0):
     """     AMOUNT OF STEPS     """
-    MC_Relaxation_Steps = 100000
-    MC_Equilibrium_Steps = 250000
+    MC_Relaxation_Steps = 200000
+    MC_Equilibrium_Steps = 500000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
 
@@ -134,6 +134,11 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Displacement *= 1.05
                 else:
                     Displacement *= 0.95
+                if Displacement < 0.05:
+                    Displacement = 0.05
+                if Displacement > L / 4.:
+                    Displacement = L /4. 
+
                 N_Accepted_Displacement, N_Displacement = 0, 0
     
     print("< E / N > = ", Energy_Sum / N_Measurements)
@@ -149,7 +154,7 @@ def u(r2):
 
 
 def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
-    Energy, Virial = 0., 0.
+    Energy = 0.
     for i in range(len(x)):
         Delta_x = rx - x[i]
         Delta_y = ry - y[i]
@@ -176,4 +181,4 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
     
     return Energy
 
-Mezei(-3.893, 1500, 2.0)
+Mezei(-2.608325, 500.34114, 2.0)
