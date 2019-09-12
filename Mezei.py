@@ -23,6 +23,8 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     x, y, z = [], [], []
     L = m.pow(V, 1. / 3.)
     Beta = 1. / T
+    N_t, Pc, Pc_Sum, Pc_N = 500, dict(), dict(), dict()
+    N_i, Overlap = N_t, 0.75
     Displacement, N_Displacement, N_Accepted_Displacement = L / 10., 0, 0
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
@@ -51,7 +53,6 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
         if i == MC_Relaxation_Steps:
             print("~~~  STARTING MEASUREMENT STEPS  ~~~")
 
-        #print(i, "/", MC_Steps)
 
         if len(x) > 1:
             """            MOVEMENT           """
@@ -123,35 +124,28 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 y_Insertion = (i_y + 1) * Delta - L / 2.
                 z_Insertion = (i_z + 1) * Delta - L / 2.
                 Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
-                """     EXCLUDED VOLUME     """
-                V_Excluded = len(x) * (4. / 3.) * m.pi
-                """ CORRECTION DUE TO SPHERE OVERLAPNESS """
-                V_Excluded_Correction = 0
-                for j in range(0, len(x), 1):
-                    for k in range(0, len(x), 1):
-                        if j != k:
-                            Delta_x = x[j] - x[k]
-                            Delta_y = y[j] - y[k]
-                            Delta_z = z[j] - z[k]
-                            r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                            if r2 < 1.0: # r2 < 1 implies overlapness 
-                                d = m.sqrt(r2)
-                                V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
-                            else:
-                                if Delta_x > L - 1.: """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
-                                    Delta_x -= L
-                                if Delta_y > L - 1.:
-                                    Delta_y -= L
-                                if Delta_z > L - 1.:
-                                    Delta_z -= L
-                                r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                                if r2 < 1.0: # r2 < 1 implies overlapness 
-                                    d = m.sqrt(r2)
-                                    V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
-                Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
-                if Volume_Ratio > 1 or Volume_Ratio < 0:
-                    raise ValueError("Volume Ratio (", Volume_Ratio, ") can't be negative nor greater than one.")
-                if rn.random() < (V_Excluded - V_Excluded_Correction)/(len(x) + 1) * m.exp(Beta * (ChemPot - Energy_Insertion))
+                """     PROBABILITY Pc      """
+                for j in range(N_t):
+                    rx = L*(rn.random() - 0.5)
+                    ry = L*(rn.random() - 0.5)
+                    rz = L*(rn.random() - 0.5)
+                    for k in range(len(x)):
+                        Delta_x = rx - x[k]
+                        Delta_y = ry - y[k]
+                        Delta_z = rz - z[k]
+                        r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                        if r2 < m.pow(Overlap, 2):
+                            N_i -= 1
+                            break
+                if len(x) not in Pc_N:
+                    Pc_N[len(x)] = 1
+                    Pc_Sum[len(x)] = N_i/N_t
+                    Pc[len(x)] = N_i/N_t
+                else:
+                    Pc_N[len(x)] += 1
+                    Pc_Sum[len(x)] += N_i/N_t
+                    Pc[len(x)] = Pc_Sum[len(x)] / Pc_N[len(x)]
+                if rn.random() < (V * Pc[len(x)] / len(x)) * m.exp(Beta * (ChemPot - Energy_Insertion)):
                     N_Insertion_Accepted += 1
                     x.append(x_Insertion)
                     y.append(y_Insertion)
@@ -159,6 +153,44 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Energy += Energy_Insertion
                 else:
                     N_Insertion_Rejected += 1
+
+                #"""     EXCLUDED VOLUME     """
+                #V_Excluded = len(x) * (4. / 3.) * m.pi
+                #""" CORRECTION DUE TO SPHERE OVERLAPNESS """
+                #V_Excluded_Correction = 0
+                #for j in range(0, len(x), 1):
+                #    for k in range(0, len(x), 1):
+                #        if j != k:
+                #            Delta_x = x[j] - x[k]
+                #            Delta_y = y[j] - y[k]
+                #            Delta_z = z[j] - z[k]
+                #            r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                #            if r2 < 1.0: # r2 < 1 implies overlapness 
+                #                d = m.sqrt(r2)
+                #                V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
+                #            else:
+                #                if Delta_x > L - 1.: """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
+                #                    Delta_x -= L
+                #                if Delta_y > L - 1.:
+                #                    Delta_y -= L
+                #                if Delta_z > L - 1.:
+                #                    Delta_z -= L
+                #                r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+                #                if r2 < 1.0: # r2 < 1 implies overlapness 
+                #                    d = m.sqrt(r2)
+                #                    V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
+                #Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
+                #if Volume_Ratio > 1 or Volume_Ratio < 0:
+                #    raise ValueError("Volume Ratio (", Volume_Ratio, ") can't be negative nor greater than one.")
+                #if rn.random() < (V_Excluded - V_Excluded_Correction)/(len(x) + 1) * m.exp(Beta * (ChemPot - Energy_Insertion))
+                #    N_Insertion_Accepted += 1
+                #    x.append(x_Insertion)
+                #    y.append(y_Insertion)
+                #    z.append(z_Insertion)
+                #    Energy += Energy_Insertion
+                #else:
+                #    N_Insertion_Rejected += 1
+
             else:        
                 x_Insertion = L*(rn.random() - 0.5)
                 y_Insertion = L*(rn.random() - 0.5)
@@ -177,15 +209,44 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             """            REMOVAL            """
             N_Removal += 1
             j = rn.randrange(0, len(x), 1)
-            Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-            if rn.random() < m.exp(-Beta * (ChemPot - Energy_Removal) + m.log(len(x) / V)):
-                N_Removal_Accepted += 1
-                x.pop(j)
-                y.pop(j)
-                z.pop(j)
-                Energy -= Energy_Removal
-            else:
-                N_Removal_Rejected += 1
+
+            """   LA INTERPOLACION VA ANTES DE LA COMPARACION CON EL NUMERO ALEATORIO. 
+            REALIZAR INTERPOLACION DE N Y N+1 HACIA N - 1.   """
+
+
+            if rn.random() > m.pow(1 - m.pow(Pc[len(x) - 1], N - 1), N_t):
+                Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+                if len(Pc) == 1:
+                    
+                    if len(x) not in Pc:
+                        lim_inf = len(x) - 1
+                        while True:
+                            if lim_inf in PC:
+                                break
+                            lim_inf -= 1
+
+                        lim_sup = len(x) + 1
+                        while True:
+                            if lim_sup in PC:
+                                break
+                            lim_sup += 1
+
+                        Pc_Interpolation = Pc[lim_inf] * (1 - (len(x) - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((len(x) - lim_inf) / (lim_sup - lim_inf))
+
+
+
+
+
+            else: 
+                Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+                if rn.random() < m.exp(-Beta * (ChemPot - Energy_Removal) + m.log(len(x) / V)):
+                    N_Removal_Accepted += 1
+                    x.pop(j)
+                    y.pop(j)
+                    z.pop(j)
+                    Energy -= Energy_Removal
+                else:
+                    N_Removal_Rejected += 1
 
         if i > 0:
             if m.fmod(i, MC_Measurement) == 0:
@@ -250,7 +311,6 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
         if r2 != 0.0:
             if r2 < m.pow(R_Cut, 2):
                 Energy += u(r2)
-    
     return Energy
 
 Mezei(-2.608325, 500.34114, 2.0)
