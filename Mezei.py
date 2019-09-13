@@ -210,36 +210,44 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             N_Removal += 1
             j = rn.randrange(0, len(x), 1)
 
-            """   LA INTERPOLACION VA ANTES DE LA COMPARACION CON EL NUMERO ALEATORIO. 
-            REALIZAR INTERPOLACION DE N Y N+1 HACIA N - 1.   """
+            """   Actual interpolacion va de N -> N - 1 y N + 1
+                    Interpolacion sugerida por Mezei va de N-1 -> N y N + 1     """
+            if (len(x) - 1) not in Pc:
+                if len(Pc) == 1
+                    Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
+                elif len(Pc) > 1:
 
+                    lim_inf = len(x) - 1
+                    while True:
+                        if lim_inf in PC:
+                            break
+                        lim_inf -= 1
 
-            if rn.random() > m.pow(1 - m.pow(Pc[len(x) - 1], N - 1), N_t):
+                    lim_sup = len(x) + 1
+                    while True:
+                        if lim_sup in PC:
+                            break
+                        lim_sup += 1
+                elif len(Pc) == 0:
+                    raise ValueError("Pc has no values still.")
+
+                Pc_Interpolation = Pc[lim_inf] * (1 - (len(x) - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((len(x) - lim_inf) / (lim_sup - lim_inf))
+            else:
+                Pc_Interpolation = Pc[len(x) - 1]
+
+            if rn.random() > m.pow(1 - m.pow(Pc_Interpolation, N - 1), N_t):
                 Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-                if len(Pc) == 1:
-                    
-                    if len(x) not in Pc:
-                        lim_inf = len(x) - 1
-                        while True:
-                            if lim_inf in PC:
-                                break
-                            lim_inf -= 1
-
-                        lim_sup = len(x) + 1
-                        while True:
-                            if lim_sup in PC:
-                                break
-                            lim_sup += 1
-
-                        Pc_Interpolation = Pc[lim_inf] * (1 - (len(x) - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((len(x) - lim_inf) / (lim_sup - lim_inf))
-
-
-
-
-
+                    if rn.random() < (len(x) / (V * Pc_Interpolation)) * m.exp(Beta * (Energy_Removal - ChemPot))
+                        N_Removal_Accepted += 1
+                        x.pop(j)
+                        y.pop(j)
+                        z.pop(j)
+                        Energy -= Energy_Removal
+                    else:
+                        N_Removal_Rejected += 1
             else: 
                 Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-                if rn.random() < m.exp(-Beta * (ChemPot - Energy_Removal) + m.log(len(x) / V)):
+                if rn.random() < m.exp(Beta * (Energy_Removal - ChemPot) + m.log(len(x) / V)):
                     N_Removal_Accepted += 1
                     x.pop(j)
                     y.pop(j)
