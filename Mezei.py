@@ -15,8 +15,8 @@ import numpy as np
     
 def Mezei(ChemPot, V, T, R_Cut = 3.0):
     """     AMOUNT OF STEPS     """
-    MC_Relaxation_Steps = 200000
-    MC_Equilibrium_Steps = 500000
+    MC_Relaxation_Steps = 2000
+    MC_Equilibrium_Steps = 5000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
 
@@ -24,15 +24,14 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     L = m.pow(V, 1. / 3.)
     Beta = 1. / T
     N_t, Pc, Pc_Sum, Pc_N = 500, dict(), dict(), dict()
-    N_i, Overlap = N_t, 0.75
+    Overlap = 0.75
     Displacement, N_Displacement, N_Accepted_Displacement = L / 10., 0, 0
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
     Energy, N_Measurements = 0., 0
     Energy_Sum, N_Sum = 0., 0.
-    for i in range(MC_Steps):
-        
+    for i in range(MC_Steps):    
         """ PRINTS TO SCREEN SUMMARY """
         if i > 0 and i < MC_Relaxation_Steps and i % int(.01 * MC_Relaxation_Steps) == 0:
             print(int(100*i / MC_Relaxation_Steps), "% Relaxation")
@@ -94,11 +93,12 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 z[j] = z_Old
 
         RN = rn.random()
+        control = len(x)
         if RN < 0.5:
             """            INSERTION          """
             N_Insertion += 1
-            grid = 64
-            EVMPS = np.ones((grid, grid, grid))
+            grid = 32
+            EVMPS = np.zeros((grid, grid, grid))
             Delta = L / (grid + 1)
             for i_x in range(0, grid, 1):
                 for i_y in range(0, grid, 1):
@@ -125,6 +125,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 z_Insertion = (i_z + 1) * Delta - L / 2.
                 Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
                 """     PROBABILITY Pc      """
+                N_i = N_t
                 for j in range(N_t):
                     rx = L*(rn.random() - 0.5)
                     ry = L*(rn.random() - 0.5)
@@ -136,7 +137,10 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                         r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
                         if r2 < m.pow(Overlap, 2):
                             N_i -= 1
+                            #if N_i < 1:
+                            #    raise ValueError("Ni cant be negative")
                             break
+
                 if len(x) not in Pc_N:
                     Pc_N[len(x)] = 1
                     Pc_Sum[len(x)] = N_i/N_t
@@ -145,7 +149,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Pc_N[len(x)] += 1
                     Pc_Sum[len(x)] += N_i/N_t
                     Pc[len(x)] = Pc_Sum[len(x)] / Pc_N[len(x)]
-                if rn.random() < (V * Pc[len(x)] / len(x)) * m.exp(Beta * (ChemPot - Energy_Insertion)):
+                if rn.random() < (V * Pc[len(x)] / (len(x) + 1)) * m.exp(Beta * (ChemPot - Energy_Insertion)):
                     N_Insertion_Accepted += 1
                     x.append(x_Insertion)
                     y.append(y_Insertion)
@@ -213,7 +217,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             """   Actual interpolacion va de N -> N - 1 y N + 1
                     Interpolacion sugerida por Mezei va de N-1 -> N y N + 1     """
             if (len(x) - 1) not in Pc:
-                if len(Pc) == 1
+                if len(Pc) == 1:
                     Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
                 elif len(Pc) > 1:
 
@@ -235,16 +239,16 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             else:
                 Pc_Interpolation = Pc[len(x) - 1]
 
-            if rn.random() > m.pow(1 - m.pow(Pc_Interpolation, N - 1), N_t):
+            if rn.random() > m.pow(1 - m.pow(Pc_Interpolation, len(x) - 1), N_t):
                 Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-                    if rn.random() < (len(x) / (V * Pc_Interpolation)) * m.exp(Beta * (Energy_Removal - ChemPot))
-                        N_Removal_Accepted += 1
-                        x.pop(j)
-                        y.pop(j)
-                        z.pop(j)
-                        Energy -= Energy_Removal
-                    else:
-                        N_Removal_Rejected += 1
+                if rn.random() < (len(x) / (V * Pc_Interpolation)) * m.exp(Beta * (Energy_Removal - ChemPot)):
+                    N_Removal_Accepted += 1
+                    x.pop(j)
+                    y.pop(j)
+                    z.pop(j)
+                    Energy -= Energy_Removal
+                else:
+                    N_Removal_Rejected += 1
             else: 
                 Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
                 if rn.random() < m.exp(Beta * (Energy_Removal - ChemPot) + m.log(len(x) / V)):
@@ -321,4 +325,4 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
                 Energy += u(r2)
     return Energy
 
-Mezei(-2.608325, 500.34114, 2.0)
+Mezei(-0.0430757, 249.68789, 2.0)
