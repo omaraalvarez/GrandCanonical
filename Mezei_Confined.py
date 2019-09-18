@@ -22,6 +22,7 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     MC_Measurement = 100
     z_Bins = 200
 
+    Density_z = np.zeros(z_Bins)
     x, y, z = [], [], []
     V = h * m.pow(L, 2)
     Beta = 1. / T
@@ -31,7 +32,7 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
-    Energy, Virial = 0., 0.
+    Energy, Virial, N_Measurements = 0., 0., 0
     Energy_Array, Pressure_Array, Density_Array = [], [], []
 
     Average_Energy_File = open("Average_Energy.dat", "w+")
@@ -289,6 +290,8 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
                     Density_Array.append( len(x) / V ) 
                     Average_Density_File.write("%d\t%f\n" % (len(Density_Array), stat.mean(Density_Array) ))
 
+                    Density_z =  z_Distribution(z, z_Bins, h, Density_z)
+                    N_Measurements += 1
                 """ PARTICLE DISPLACEMENT """
                 if 1. * N_Accepted_Displacement / N_Displacement > 0.55:
                     Displacement *= 1.05
@@ -304,6 +307,14 @@ def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     Average_Energy_File.close()
     Average_Pressure_File.close()
     Average_Density_File.close()
+
+    z_Distribution_File = open("z_Distribution.dat", "w+")
+    z_Distribution_File.write("h\tDensity")
+    z_Distribution = [x / N_Measurements for x in z_Distribution]
+    for i in range(z_Bins):
+        z_Distribution_File.write("%.6f\t%.6f" % (h * (i / z_Bins + (1 / z_Bins - 1) / 2), z_Distribution[i]) )
+        h_z[i] = 
+    z_Distribution_File.close()
 
     Pc_File = open("Pc.dat", "w+")
     for i in Pc:
@@ -362,8 +373,8 @@ def z_Distribution(z, z_Bins, h, Density_z):
     for i in range(z_Bins):
         A = [x >= i * Delta - h / 2 for x in z_sorted]
         B = [x <= (i+1) * Delta - h / 2 for x in z_sorted]
-
-        Density_z[i] +=
+        Density_z[i] += np.sum(np.logical_and(A, B))
+    return Density_z
     
 
-Mezei(17.9183859, 250.0586992251, 4.0)
+Mezei(17.9183859, 10, 10, 4.0)
