@@ -14,15 +14,16 @@ import math as m
 import numpy as np
 import statistics as stat
     
-def Mezei(ChemPot, V, T, R_Cut = 3.0):
+def Mezei(ChemPot, h, L, T, R_Cut = 3.0):
     """     AMOUNT OF STEPS     """
     MC_Relaxation_Steps = 20000
     MC_Equilibrium_Steps = 10000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
+    z_Bins = 200
 
     x, y, z = [], [], []
-    L = m.pow(V, 1. / 3.)
+    V = h * m.pow(L, 2)
     Beta = 1. / T
     Overlap = 0.75
     Pc, Pc_Sum, Pc_N = dict(), dict(), dict()
@@ -85,11 +86,12 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             elif y[j] > L / 2.:
                 y[j] -= L
 
-            z[j] += Displacement * (rn.random() - 0.5)
+            z_Displacement = Displacement * (rn.random() - 0.5)
+            z[j] += z_Displacement
             if z[j] <  -L / 2.:
-                z[j] += L
+                z[j] -= z_Displacement 
             elif z[j] > L / 2.:
-                z[j] -= L
+                z[j] -= z_Displacement
             
             Energy_New, Virial_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
             Delta_E = Energy_New - Energy_Old
@@ -323,7 +325,6 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     print("     Accepted: %d" % N_Removal_Accepted)
     print("     Rejected: %d" % N_Removal_Rejected)
                 
-
 def u(r2):
     return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
 
@@ -347,15 +348,22 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
         elif Delta_y < -L / 2.0:
             Delta_y += L
 
-        if Delta_z > L / 2.0:
-            Delta_z -= L
-        elif Delta_z < -L / 2.0:
-            Delta_z += L
         r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
         if r2 != 0.0:
             if r2 < m.pow(R_Cut, 2):
                 Energy += u(r2)
                 Virial += rdu(r2)
     return Energy, Virial
+
+def z_Distribution(z, z_Bins, h, Density_z):
+    z_sorted = z.copy()
+    z_sorted.sort()
+    Delta = h / z_Bins
+    for i in range(z_Bins):
+        A = [x >= i * Delta - h / 2 for x in z_sorted]
+        B = [x <= (i+1) * Delta - h / 2 for x in z_sorted]
+
+        Density_z[i] +=
+    
 
 Mezei(17.9183859, 250.0586992251, 4.0)
