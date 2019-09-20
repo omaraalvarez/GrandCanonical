@@ -13,7 +13,6 @@ import math as m
 import numpy as np
 import os
 
-#from numba import jit
 from random import random, randrange
 from statistics import mean, pstdev
 from timeit import default_timer as timer
@@ -21,8 +20,8 @@ from timeit import default_timer as timer
 def Mezei(ChemPot, V, T, R_Cut = 3.0):
     start = timer()
     """     AMOUNT OF STEPS     """
-    MC_Relaxation_Steps = 1000
-    MC_Equilibrium_Steps = 1000
+    MC_Relaxation_Steps = 20000
+    MC_Equilibrium_Steps = 15000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
 
@@ -57,7 +56,19 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             print("N = %d" % len(x))
             print("Density = %.6f" % (len(x)/V) )
             print("Max Displacement = %.6f" % Displacement)
+            print("Movements: %d" % N_Movement)
+            print("     Accepted: %d" % N_Movement_Accepted)
+            print("     Rejected: %d" % N_Movement_Rejected)
+            print("Insertions: %d" % N_Insertion)
+            print("     Accepted: %d" % N_Insertion_Accepted)
+            print("     Rejected: %d" % N_Insertion_Rejected)
+            print("Removal: %d" % N_Removal)
+            print("     Accepted: %d" % N_Removal_Accepted)
+            print("     Rejected: %d" % N_Removal_Rejected)
             print("")
+            N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
+            N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
+            N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
 
         if i > 0 and i > MC_Relaxation_Steps and i % int(0.01 * (MC_Steps - MC_Relaxation_Steps)) == 0:
             print("%d%% Equilibrium" % (100*(i - MC_Relaxation_Steps) / (MC_Equilibrium_Steps)))
@@ -66,7 +77,19 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             print("N = %d" % len(x))
             print("Density = %.6f" % (len(x)/V) )
             print("Max Displacement = %.6f" % Displacement)
+            print("Movements: %d" % N_Movement)
+            print("     Accepted: %d" % N_Movement_Accepted)
+            print("     Rejected: %d" % N_Movement_Rejected)
+            print("Insertions: %d" % N_Insertion)
+            print("     Accepted: %d" % N_Insertion_Accepted)
+            print("     Rejected: %d" % N_Insertion_Rejected)
+            print("Removal: %d" % N_Removal)
+            print("     Accepted: %d" % N_Removal_Accepted)
+            print("     Rejected: %d" % N_Removal_Rejected)
             print("")
+            N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
+            N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
+            N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
 
         if i == MC_Relaxation_Steps:
             print("~~~  STARTING MEASUREMENT STEPS  ~~~")
@@ -320,22 +343,32 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     print("< P > = %.6f + %.6f" % (mean(Pressure_Array), pstdev(Pressure_Array)) )
     print("< Density > = %.6f + %.6f " % (mean(Density_Array), pstdev(Density_Array)) )
     print("< N > = %.6f + %.6f " % (V*mean(Density_Array), V*pstdev(Density_Array)) )
-    print(" ")
-    print("Movements: %d" % N_Movement)
-    print("     Accepted: %d" % N_Movement_Accepted)
-    print("     Rejected: %d" % N_Movement_Rejected)
-    print("Insertions: %d" % N_Insertion)
-    print("     Accepted: %d" % N_Insertion_Accepted)
-    print("     Rejected: %d" % N_Insertion_Rejected)
-    print("Removal: %d" % N_Removal)
-    print("     Accepted: %d" % N_Removal_Accepted)
-    print("     Rejected: %d" % N_Removal_Rejected)
-
     dt = timer() - start
     print("Elapsed time: %f s" % dt)
-          
+
+    Summary_File = open("%s/Summary.txt" % Output_Route, "w+")
+    Summary_File.write("Mezei algorithm for the Grand Canonical Monte Carlo Simulation\n\n")
+    Summary_File.write("~~~~~   INPUT   ~~~~~\n\n")
+    Summary_File.write("Chemical Potential = %.6f\n" % ChemPot)
+    Summary_File.write("Volume = %.3f (L = %.6f)\n" % (V, L))
+    Summary_File.write("Temperature = %.3f\n\n" % T)
+    Summary_File.write("Relaxation Steps: %d.   Equilibrium Steps: %d\n\n" % (MC_Relaxation_Steps, MC_Equilibrium_Steps))
+    Summary_File.write("~~~~~   OUTPUT  ~~~~~\n\n")
+    Summary_File.write("< E / N > = %.6f + %.6f\n" % (mean(Energy_Array), pstdev(Energy_Array)) )
+    Summary_File.write("< P > = %.6f + %.6f\n" % (mean(Pressure_Array), pstdev(Pressure_Array)) )
+    Summary_File.write("< Density > = %.6f + %.6f\n" % (mean(Density_Array), pstdev(Density_Array)) )
+    Summary_File.write("< N > = %.6f + %.6f\n" % (V*mean(Density_Array), V*pstdev(Density_Array)) )
+
 def u(r2):
-    return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
+    if r2 <= 1:
+        return m.inf
+    if r2 > 1 and r2 <= 1.5:
+        return -1
+    if r2 > 1.5:
+        return 0
+
+#def u(r2):
+#    return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
 
 def rdu(r2):
     return 4.0*(6*m.pow(1. / r2, 3.0) - 12.0 * m.pow(1.0 / r2, 6.0))
@@ -368,4 +401,6 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
                 Virial += rdu(r2)
     return Energy, Virial
 
-Mezei(-17.9183859, 250.0586992251, 4.0)
+    
+
+Mezei(18.644, 384.16, 4.0)
