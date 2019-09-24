@@ -37,6 +37,10 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Energy, Virial = 0., 0.
     Energy_Array, Pressure_Array, Density_Array = [], [], []
 
+    print("#" * 40 + "\n#" + " " * 38 + "#")
+    print("#" + " " * 4 + "Monte Carlo + Excluded Volume" + " " * 5 + "#" + "\n#" + " " * 38 + "#")
+    print("#" * 40)
+
     Output_Route = "Output/ChPot_%.3f_T_%.2f" % (ChemPot, T)
     if not os.path.exists(Output_Route):
         os.makedirs(Output_Route)
@@ -102,26 +106,10 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             j = randrange(0, len(x), 1)
             Energy_Old, Virial_Old = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
             x_Old, y_Old, z_Old = x[j], y[j], z[j]
-
-            """     DISPLACEMENT AND PERIODIC BOUNDARY CONDITIONS """
-            x[j] += Displacement * (random() - 0.5)
-            if x[j] <  -L / 2.:
-                x[j] += L
-            elif x[j] > L / 2.:
-                x[j] -= L
-                
+            x[j] += Displacement * (random() - 0.5)                
             y[j] += Displacement * (random() - 0.5)
-            if y[j] <  -L / 2.:
-                y[j] += L
-            elif y[j] > L / 2.:
-                y[j] -= L
-
             z[j] += Displacement * (random() - 0.5)
-            if z[j] <  -L / 2.:
-                z[j] += L
-            elif z[j] > L / 2.:
-                z[j] -= L
-            
+            x[j], y[j], z[j] = PeriodicBoundaryConditions(L, x[j], y[j], z[j])
             Energy_New, Virial_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
             Delta_E = Energy_New - Energy_Old
             Delta_Virial = Virial_New - Virial_Old
@@ -240,26 +228,14 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 #    N_Insertion_Rejected += 1
 
             else:        
-                x_Insertion = L*(random() - 0.5)
-                y_Insertion = L*(random() - 0.5)
-                z_Insertion = L*(random() - 0.5)
-                Energy_Insertion, Virial_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
-                if random() < m.exp(Beta * (ChemPot - Energy_Insertion) + m.log(V / (len(x) + 1))):
-                    N_Insertion_Accepted += 1
-                    x.append(x_Insertion)
-                    y.append(y_Insertion)
-                    z.append(z_Insertion)
-                    Energy += Energy_Insertion
-                    Virial += Virial_Insertion
-                else:
-                    N_Insertion_Rejected += 1
+                Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected)
 
         elif len(x) > 1:
             """            REMOVAL            """
             N_Removal += 1
             j = randrange(0, len(x), 1)
 
-            """   IN CASE THE VALUE REQUIRED DOES'T EXIST
+            """   IN CASE THE VALUE REQUIRED DOESN'T EXIST
                     A LINEAR INTERPOLATION IS CARRIED ON.  """
             if (len(x) - 1) not in Pc:
                 if len(Pc) == 1:
@@ -359,41 +335,43 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Summary_File.write("< Density > = %.6f + %.6f\n" % (mean(Density_Array), pstdev(Density_Array)) )
     Summary_File.write("< N > = %.6f + %.6f\n" % (V*mean(Density_Array), V*pstdev(Density_Array)) )
 
-def u(r2):
-    if r2 <= 1:
-        return m.inf
-    if r2 > 1 and r2 <= 1.5:
-        return -1
-    if r2 > 1.5:
-        return 0
-
 #def u(r2):
-#    return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
+#    if r2 <= 1:
+#        return m.inf
+#    if r2 > 1 and r2 <= 1.5:
+#        return -1
+#    if r2 > 1.5:
+#        return 0
+
+def Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected):
+    x_Insertion = L*(random() - 0.5)
+    y_Insertion = L*(random() - 0.5)
+    z_Insertion = L*(random() - 0.5)
+    Energy_Insertion, Virial_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
+    if random() < m.exp(Beta * (ChemPot - Energy_Insertion) + m.log(V / (len(x) + 1))):
+        N_Insertion_Accepted += 1
+        x.append(x_Insertion)
+        y.append(y_Insertion)
+        z.append(z_Insertion)
+        Energy += Energy_Insertion
+        Virial += Virial_Insertion
+    else:
+        N_Insertion_Rejected += 1
+    return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
+
+def u(r2):
+    return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
 
 def rdu(r2):
     return 4.0*(6*m.pow(1. / r2, 3.0) - 12.0 * m.pow(1.0 / r2, 6.0))
-
+11
 def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
     Energy, Virial = 0., 0.
     for i in range(len(x)):
         Delta_x = rx - x[i]
         Delta_y = ry - y[i]
         Delta_z = rz - z[i]        
-        """    PERIODIC BOUNDARY CONDITIONS    """
-        if Delta_x > L / 2.0:
-            Delta_x -= L
-        elif Delta_x < -L / 2.0:
-            Delta_x += L
-
-        if Delta_y > L / 2.0:
-                Delta_y -= L
-        elif Delta_y < -L / 2.0:
-            Delta_y += L
-
-        if Delta_z > L / 2.0:
-            Delta_z -= L
-        elif Delta_z < -L / 2.0:
-            Delta_z += L
+        Delta_x, Delta_y, Delta_z = PeriodicBoundaryConditions(L, Delta_x, Delta_y, Delta_z)
         r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
         if r2 != 0.0:
             if r2 < m.pow(R_Cut, 2):
@@ -401,6 +379,22 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
                 Virial += rdu(r2)
     return Energy, Virial
 
-    
+def PeriodicBoundaryConditions(L, x, y, z):
+    if x <  -L / 2.:
+        x += L
+    elif x > L / 2.:
+        x -= L
 
-Mezei(18.644, 384.16, 4.0)
+    if y <  -L / 2.:
+        y += L
+    elif y > L / 2.:
+        y -= L
+
+    if z <  -L / 2.:
+        z += L
+    elif z > L / 2.:
+        z -= L
+    
+    return x, y, z
+
+Mezei(17.9183589140279, 250.058699225, 4.0)
