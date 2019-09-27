@@ -20,8 +20,8 @@ from timeit import default_timer as timer
 def Mezei(ChemPot, V, T, R_Cut = 3.0):
     start = timer()
     """     AMOUNT OF STEPS     """
-    MC_Relaxation_Steps = 15000
-    MC_Equilibrium_Steps = 15000
+    MC_Relaxation_Steps = 5000
+    MC_Equilibrium_Steps = 25000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
 
@@ -106,7 +106,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
         if RN < 0.5:
             """            INSERTION          """
             N_Insertion += 1
-            Grid = 8
+            Grid = 10
             Delta = L / (Grid + 1)
             EVMPS = ExcludedVolume(L, Grid, Delta, x, y, z)
             if np.sum(EVMPS) < m.pow(Grid, 3):
@@ -344,7 +344,7 @@ def ExcludedVolume(L, Grid, Delta, x, y, z):
                     Delta_y = y_Grid - y[k]
                     Delta_z = z_Grid - z[k]
                     r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                    if r2 < m.pow(0.75, 2):
+                    if r2 < m.pow(0.6, 2):
                         EVMPS[i_x, i_y, i_z] = 1
                         break
     return EVMPS
