@@ -29,7 +29,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     L = m.pow(V, 1. / 3.)
     Beta = 1. / T
     Pc, Pc_Sum, Pc_N = dict(), dict(), dict()
-    Displacement = L / 8
+    Displacement, N_Displacement, N_Displacement_Accepted = L / 8, 0, 0
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
@@ -97,13 +97,15 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
         if i == MC_Relaxation_Steps:
             print("~~~  STARTING MEASUREMENT STEPS  ~~~")
 
-        if len(x) > 1:
+        RN = randrange(1, 4)
+        if RN == 1 and len(x) > 1:
             """            MOVEMENT           """
             N_Movement += 1
-            Energy, Virial, N_Movement_Accepted, N_Movement_Rejected = Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, R_Cut, x, y, z)
+            N_Displacement += 1
+            Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
 
-        RN = random()
-        if RN < 0.5:
+        
+        if RN == 2:
             """            INSERTION          """
             N_Insertion += 1
             Grid = 10
@@ -114,36 +116,16 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             else:        
                 Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected)
 
-        elif len(x) > 1:
+        if RN == 3 and len(x) > 1:
             """            REMOVAL            """
             N_Removal += 1
             j = randrange(0, len(x), 1)
-
-            """   IN CASE THE VALUE REQUIRED DOESN'T EXIST
-                    A LINEAR INTERPOLATION IS CARRIED ON.  """
+            """   IN CASE THE VALUE REQUIRED DOESN'T EXIST YET,
+                    A LINEAR INTERPOLATION IS CARRIED ON USING THE TWO CLOSEST VALUES.  """
             if (len(x) - 1) not in Pc:
-                if len(Pc) == 1:
-                    Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
-                elif len(Pc) > 1:
-
-                    lim_inf = len(x) - 1
-                    while True:
-                        if lim_inf in Pc:
-                            break
-                        lim_inf -= 1
-
-                    lim_sup = len(x) + 1
-                    while True:
-                        if lim_sup in Pc:
-                            break
-                        lim_sup += 1
-                elif len(Pc) == 0:
-                    raise ValueError("Pc has no values still.")
-
-                Pc_Interpolation = Pc[lim_inf] * (1 - (len(x) - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((len(x) - lim_inf) / (lim_sup - lim_inf))
+                Pc_Interpolation = Interpolation(Pc, len(x))
             else:
                 Pc_Interpolation = Pc[len(x) - 1]
-
             if random() > m.pow(1 - m.pow(Pc_Interpolation, len(x) - 1), m.pow(Grid, 3)):
                 Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
                 if random() < (len(x) / (V * Pc_Interpolation)) * m.exp(Beta * (Energy_Removal - ChemPot)):
@@ -179,7 +161,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Average_Density_File.write("%d\t%f\n" % (len(Density_Array), mean(Density_Array) ))
 
                 """ PARTICLE DISPLACEMENT """
-                if 1. * N_Movement_Accepted / N_Movement > 0.55:
+                if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
                     Displacement *= 1.05
                 else:
                     Displacement *= 0.95
@@ -187,6 +169,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Displacement = 0.05
                 if Displacement > L / 4.:
                     Displacement = L /4. 
+                N_Displacement, N_Displacement_Accepted = 0, 0
     
     Average_Energy_File.close()
     Average_Pressure_File.close()
@@ -225,19 +208,22 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
 #    if r2 > 1.5:
 #        return 0
 
-def Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, R_Cut, x, y, z):
+def Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z):
     j = randrange(0, len(x), 1)
     Energy_Old, Virial_Old = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     x_Old, y_Old, z_Old = x[j], y[j], z[j]
     x[j] += Displacement * (random() - 0.5)                
     y[j] += Displacement * (random() - 0.5)
     z[j] += Displacement * (random() - 0.5)
-    x[j], y[j], z[j] = PeriodicBoundaryConditions(L, x[j], y[j], z[j])
+    x[j] = PeriodicBoundaryConditions(L, x[j])
+    y[j] = PeriodicBoundaryConditions(L, y[j])
+    z[j] = PeriodicBoundaryConditions(L, z[j])
     Energy_New, Virial_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     Delta_E = Energy_New - Energy_Old
     Delta_Virial = Virial_New - Virial_Old
     if random() < m.exp(-Beta * Delta_E):
         N_Movement_Accepted += 1
+        N_Displacement_Accepted += 1
         Energy += Delta_E
         Virial += Delta_Virial
     else:
@@ -245,7 +231,7 @@ def Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movem
         x[j] = x_Old
         y[j] = y_Old
         z[j] = z_Old
-    return Energy, Virial, N_Movement_Accepted, N_Movement_Rejected
+    return Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted
 
 def Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected):
     x_Insertion = L*(random() - 0.5)
@@ -298,14 +284,16 @@ def u(r2):
 
 def rdu(r2):
     return 4.0*(6*m.pow(1. / r2, 3.0) - 12.0 * m.pow(1.0 / r2, 6.0))
-11
+
 def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
     Energy, Virial = 0., 0.
     for i in range(len(x)):
         Delta_x = rx - x[i]
         Delta_y = ry - y[i]
         Delta_z = rz - z[i]        
-        Delta_x, Delta_y, Delta_z = PeriodicBoundaryConditions(L, Delta_x, Delta_y, Delta_z)
+        Delta_x = PeriodicBoundaryConditions(L, Delta_x)
+        Delta_y = PeriodicBoundaryConditions(L, Delta_y)
+        Delta_z = PeriodicBoundaryConditions(L, Delta_z)
         r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
         if r2 != 0.0:
             if r2 < m.pow(R_Cut, 2):
@@ -313,23 +301,13 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
                 Virial += rdu(r2)
     return Energy, Virial
 
-def PeriodicBoundaryConditions(L, x, y, z):
+def PeriodicBoundaryConditions(L, x):
     if x <  -L / 2.:
         x += L
     elif x > L / 2.:
         x -= L
-
-    if y <  -L / 2.:
-        y += L
-    elif y > L / 2.:
-        y -= L
-
-    if z <  -L / 2.:
-        z += L
-    elif z > L / 2.:
-        z -= L
     
-    return x, y, z
+    return x
 
 def ExcludedVolume(L, Grid, Delta, x, y, z):
     EVMPS = np.zeros((Grid, Grid, Grid))
@@ -386,5 +364,25 @@ def ExcludedVolume(L, Grid, Delta, x, y, z):
                 #else:
                 #    N_Insertion_Rejected += 1
 
+def Interpolaiton(Pc, l):
+    if len(Pc) == 1:
+        Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
+    elif len(Pc) > 1:
+        lim_inf = l - 1
+        while True:
+            if lim_inf in Pc:
+                break
+            lim_inf -= 1
+
+        lim_sup = l + 1
+        while True:
+            if lim_sup in Pc:
+                break
+            lim_sup += 1
+    elif len(Pc) == 0:
+        raise ValueError("Pc has no values still.")
+
+    Pc_Interpolation = Pc[lim_inf] * ((1 - l - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((l - lim_inf) / (lim_sup - lim_inf))
+    return Pc_Interpolation
 
 Mezei(17.9183589140279, 250.058699225, 4.0)
