@@ -177,7 +177,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     """     CAVITY PROBABILITIES OUTPUT     """
     Pc_File = open("%s/Pc.dat" % Output_Route, "w+")
     for i in Pc:
-        Pc_File.write("%d\t%.6f}t%.6f\n" % (i, Pc[i], Pc_Analytic[i]))
+        Pc_File.write("%d\t%.6f\t%.6f\n" % (i, Pc[i], Pc_Analytic[i]))
     Pc_File.close()
 
     print("< E / N > = %.6f + %.6f" % (mean(Energy_Array), pstdev(Energy_Array)) )
@@ -376,7 +376,7 @@ def Analytic_Excluded_Volume(L, V, x, y, z):
     if Volume_Ratio > 1 or Volume_Ratio < 0:
         raise ValueError("Volume Ratio (%.6f) can't be negative nor greater than one." % Volume_Ratio)
     #print("V Excluded = %.6f, V_Correction = %.6f, V = %.6f" % (V_Excluded, V_Excluded_Correction, V_Excluded - V_Excluded_Correction))
-    return Volume_Ratio
+    return 1 - Volume_Ratio
 
 def Interpolation(Pc, l):
     if len(Pc) == 1:
