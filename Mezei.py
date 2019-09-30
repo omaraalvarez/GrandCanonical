@@ -9,37 +9,38 @@
 #                                                            #
 ##############################################################
 
-import math as m
 import numpy as np
 import os
 
+from math import exp, log, pow, fmod, pi, sqrt
 from random import random, randrange
 from statistics import mean, pstdev
 from timeit import default_timer as timer
            
 def Mezei(ChemPot, V, T, R_Cut = 3.0):
     start = timer()
-    """     AMOUNT OF STEPS     """
+    """     CONFIGURATIONAL     STEPS           """
     MC_Relaxation_Steps = 5000
     MC_Equilibrium_Steps = 25000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
-
+    """     VARIABLE    INITIALIZATION         """
     x, y, z = [], [], []
-    L = m.pow(V, 1. / 3.)
+    L = pow(V, 1. / 3.)
     Beta = 1. / T
     Pc, Pc_Sum, Pc_N = dict(), dict(), dict()
+    Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = dict(), dict(), dict()
     Displacement, N_Displacement, N_Displacement_Accepted = L / 8, 0, 0
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
     Energy, Virial = 0., 0.
     Energy_Array, Pressure_Array, Density_Array = [], [], []
-
+    """         PROGRAM     HEADER          """
     print("#" * 40 + "\n#" + " " * 38 + "#")
     print("#" + " " * 4 + "Monte Carlo + Excluded Volume" + " " * 5 + "#" + "\n#" + " " * 38 + "#")
     print("#" * 40)
-
+    """       OUTPUT      ROUTES       """
     Output_Route = "Output/ChPot_%.3f_T_%.2f" % (ChemPot, T)
     if not os.path.exists(Output_Route):
         os.makedirs(Output_Route)
@@ -49,7 +50,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Average_Pressure_File.write("#\t< P >\n")
     Average_Density_File = open("%s/Average_Density.dat" % Output_Route, "w+")
     Average_Density_File.write("#\t< Density >\n")
-    
+    """     SIMULATION'S    CYCLE       """
     for i in range(MC_Steps):    
         """ PRINTS TO SCREEN SUMMARY """
         if i > 0 and i < MC_Relaxation_Steps and i % int(.01 * MC_Relaxation_Steps) == 0:
@@ -98,6 +99,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             print("~~~  STARTING MEASUREMENT STEPS  ~~~")
 
         RN = randrange(1, 4)
+        """     EQUAL PROBABILITY FOR PARTICLE MOVEMENT, INSERTION OR DELETION      """
         if RN == 1 and len(x) > 1:
             """            MOVEMENT           """
             N_Movement += 1
@@ -111,48 +113,46 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             Grid = 10
             Delta = L / (Grid + 1)
             EVMPS = ExcludedVolume(L, Grid, Delta, x, y, z)
-            if np.sum(EVMPS) < m.pow(Grid, 3):
+
+
+            Volume_Ratio = Analytic_Excluded_Volume(L, V, x, y, z)
+            if len(x) not in Pc_Analytic_N:
+                Pc_Analytic_N[len(x)] = 1
+                Pc_Analytic_Sum[len(x)] = Volume_Ratio
+                Pc_Analytic[len(x)] = Volume_Ratio
+            else:
+                Pc_Analytic_N[len(x)] = 1
+                Pc_Analytic_Sum[len(x)] += Volume_Ratio
+                Pc_Analytic[len(x)] = Volume_Ratio / Pc_Analytic_N[len(x)]
+
+            if np.sum(EVMPS) < pow(Grid, 3):
+                """     INSERTION IN AVAILABLE SPACE    """
                 Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z)                
             else:        
+                """     RANDOM INSERTION        """
                 Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected)
 
         if RN == 3 and len(x) > 1:
             """            REMOVAL            """
             N_Removal += 1
-            j = randrange(0, len(x), 1)
-            """   IN CASE THE VALUE REQUIRED DOESN'T EXIST YET,
-                    A LINEAR INTERPOLATION IS CARRIED ON USING THE TWO CLOSEST VALUES.  """
-            if (len(x) - 1) not in Pc:
-                Pc_Interpolation = Interpolation(Pc, len(x))
+            """   Pc[N - 1] IS REQUIRED  """
+            if len(Pc) == 1:
+                Pc_Interpolation = list(Pc.values())[0]
             else:
-                Pc_Interpolation = Pc[len(x) - 1]
-            if random() > m.pow(1 - m.pow(Pc_Interpolation, len(x) - 1), m.pow(Grid, 3)):
-                Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-                if random() < (len(x) / (V * Pc_Interpolation)) * m.exp(Beta * (Energy_Removal - ChemPot)):
-                    N_Removal_Accepted += 1
-                    x.pop(j)
-                    y.pop(j)
-                    z.pop(j)
-                    Energy -= Energy_Removal
-                    Virial -= Virial_Removal
+                if (len(x) - 1) not in Pc:
+                    """     IF Pc[N - 1] IS NOT IN THE ARRAY, AN EXTRAPOLATION OF ITS VALUE IS USED IN THE MEANTIME VIA THE CLOSEST HIGHER AND LOWER VALUE"""
+                    Pc_Interpolation = Interpolation(Pc, len(x))
                 else:
-                    N_Removal_Rejected += 1
-            else: 
-                Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
-                if random() < m.exp(Beta * (Energy_Removal - ChemPot) + m.log(len(x) / V)):
-                    N_Removal_Accepted += 1
-                    x.pop(j)
-                    y.pop(j)
-                    z.pop(j)
-                    Energy -= Energy_Removal
-                    Virial -= Virial_Removal
-                else:
-                    N_Removal_Rejected += 1
+                    Pc_Interpolation = Pc[len(x) - 1]
 
+            if random() > pow(1 - Pc_Interpolation, pow(Grid, 3)):
+                Energy, Virial, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
+            else: 
+                Energy, Virial, N_Removal_Accepted, N_Removal_Rejected = Removal(L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
+        """      AVERAGES    """
         if i > 0:
-            if m.fmod(i, MC_Measurement) == 0:
+            if fmod(i, MC_Measurement) == 0:
                 if i >= MC_Relaxation_Steps:
-                    """     COMPUTES AVERAGES    """
                     Energy_Array.append( Energy/len(x) )
                     Average_Energy_File.write("%d\t%f\n" % (len(Energy_Array), mean(Energy_Array)))
                     Pressure_Array.append( (len(x) * T - Virial / 3.0) / V )
@@ -174,10 +174,10 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Average_Energy_File.close()
     Average_Pressure_File.close()
     Average_Density_File.close()
-
+    """     CAVITY PROBABILITIES OUTPUT     """
     Pc_File = open("%s/Pc.dat" % Output_Route, "w+")
     for i in Pc:
-        Pc_File.write("%d\t%f\n" % (i, Pc[i]))
+        Pc_File.write("%d\t%.6f}t%.6f\n" % (i, Pc[i], Pc_Analytic[i]))
     Pc_File.close()
 
     print("< E / N > = %.6f + %.6f" % (mean(Energy_Array), pstdev(Energy_Array)) )
@@ -200,14 +200,6 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Summary_File.write("< Density > = %.6f + %.6f\n" % (mean(Density_Array), pstdev(Density_Array)) )
     Summary_File.write("< N > = %.6f + %.6f\n" % (V*mean(Density_Array), V*pstdev(Density_Array)) )
 
-#def u(r2):
-#    if r2 <= 1:
-#        return m.inf
-#    if r2 > 1 and r2 <= 1.5:
-#        return -1
-#    if r2 > 1.5:
-#        return 0
-
 def Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z):
     j = randrange(0, len(x), 1)
     Energy_Old, Virial_Old = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
@@ -221,7 +213,7 @@ def Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movem
     Energy_New, Virial_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     Delta_E = Energy_New - Energy_Old
     Delta_Virial = Virial_New - Virial_Old
-    if random() < m.exp(-Beta * Delta_E):
+    if random() < exp(-Beta * Delta_E):
         N_Movement_Accepted += 1
         N_Displacement_Accepted += 1
         Energy += Delta_E
@@ -238,7 +230,7 @@ def Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_A
     y_Insertion = L*(random() - 0.5)
     z_Insertion = L*(random() - 0.5)
     Energy_Insertion, Virial_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
-    if random() < m.exp(Beta * (ChemPot - Energy_Insertion) + m.log(V / (len(x) + 1))):
+    if random() < exp(Beta * (ChemPot - Energy_Insertion) + log(V / (len(x) + 1))):
         N_Insertion_Accepted += 1
         x.append(x_Insertion)
         y.append(y_Insertion)
@@ -262,13 +254,13 @@ def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, 
     """     PROBABILITY Pc      """
     if len(x) not in Pc_N:
         Pc_N[len(x)] = 1
-        Pc_Sum[len(x)] = 1 - (np.sum(EVMPS) / m.pow(Grid, 3))
-        Pc[len(x)] = 1 - (np.sum(EVMPS) / m.pow(Grid, 3))
+        Pc_Sum[len(x)] = 1 - (np.sum(EVMPS) / pow(Grid, 3))
+        Pc[len(x)] = 1 - (np.sum(EVMPS) / pow(Grid, 3))
     else:
         Pc_N[len(x)] += 1
-        Pc_Sum[len(x)] += 1 - (np.sum(EVMPS) / m.pow(Grid, 3)) #N_i/N_t
+        Pc_Sum[len(x)] += 1 - (np.sum(EVMPS) / pow(Grid, 3)) #N_i/N_t
         Pc[len(x)] = Pc_Sum[len(x)] / Pc_N[len(x)]
-    if random() < (V * Pc[len(x)] / (len(x) + 1)) * m.exp(Beta * (ChemPot - Energy_Insertion)):
+    if random() < (V * Pc[len(x)] / (len(x) + 1)) * exp(Beta * (ChemPot - Energy_Insertion)):
         N_Insertion_Accepted += 1
         x.append(x_Insertion)
         y.append(y_Insertion)
@@ -279,11 +271,39 @@ def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, 
         N_Insertion_Rejected += 1
     return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
 
+def Removal(L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z):
+    j = randrange(0, len(x), 1)
+    Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+    if random() < exp(Beta * (Energy_Removal - ChemPot) + log(len(x) / V)):
+        N_Removal_Accepted += 1
+        x.pop(j)
+        y.pop(j)
+        z.pop(j)
+        Energy -= Energy_Removal
+        Virial -= Virial_Removal
+    else:
+        N_Removal_Rejected += 1
+    return Energy, Virial, N_Removal_Accepted, N_Removal_Rejected
+
+def Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z):
+    j = randrange(0, len(x), 1)
+    Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+    if random() < (len(x) / (V * Pc_Interpolation)) * exp(Beta * (Energy_Removal - ChemPot)):
+        N_Removal_Accepted += 1
+        x.pop(j)
+        y.pop(j)
+        z.pop(j)
+        Energy -= Energy_Removal
+        Virial -= Virial_Removal
+    else:
+        N_Removal_Rejected += 1
+    return Energy, Virial, N_Removal_Accepted, N_Removal_Rejected
+
 def u(r2):
-    return 4.0*(m.pow(1. / r2, 6.0) - m.pow(1. / r2, 3.))
+    return 4.0*(pow(1. / r2, 6.0) - pow(1. / r2, 3.))
 
 def rdu(r2):
-    return 4.0*(6*m.pow(1. / r2, 3.0) - 12.0 * m.pow(1.0 / r2, 6.0))
+    return 4.0*(6*pow(1. / r2, 3.0) - 12.0 * pow(1.0 / r2, 6.0))
 
 def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
     Energy, Virial = 0., 0.
@@ -294,9 +314,9 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
         Delta_x = PeriodicBoundaryConditions(L, Delta_x)
         Delta_y = PeriodicBoundaryConditions(L, Delta_y)
         Delta_z = PeriodicBoundaryConditions(L, Delta_z)
-        r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
+        r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
         if r2 != 0.0:
-            if r2 < m.pow(R_Cut, 2):
+            if r2 < pow(R_Cut, 2):
                 Energy += u(r2)
                 Virial += rdu(r2)
     return Energy, Virial
@@ -321,50 +341,44 @@ def ExcludedVolume(L, Grid, Delta, x, y, z):
                     Delta_x = x_Grid - x[k]
                     Delta_y = y_Grid - y[k]
                     Delta_z = z_Grid - z[k]
-                    r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                    if r2 < m.pow(0.6, 2):
+                    r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+                    if r2 < pow(0.6, 2):
                         EVMPS[i_x, i_y, i_z] = 1
                         break
     return EVMPS
 
-                #"""     EXCLUDED VOLUME     """
-                #V_Excluded = len(x) * (4. / 3.) * m.pi
-                #""" CORRECTION DUE TO SPHERE OVERLAPNESS """
-                #V_Excluded_Correction = 0
-                #for j in range(0, len(x), 1):
-                #    for k in range(0, len(x), 1):
-                #        if j != k:
-                #            Delta_x = x[j] - x[k]
-                #            Delta_y = y[j] - y[k]
-                #            Delta_z = z[j] - z[k]
-                #            r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                #            if r2 < 1.0: # r2 < 1 implies overlapness 
-                #                d = m.sqrt(r2)
-                #                V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
-                #            else:
-                #                if Delta_x > L - 1.: """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
-                #                    Delta_x -= L
-                #                if Delta_y > L - 1.:
-                #                    Delta_y -= L
-                #                if Delta_z > L - 1.:
-                #                    Delta_z -= L
-                #                r2 = m.pow(Delta_x, 2) + m.pow(Delta_y, 2) + m.pow(Delta_z, 2)
-                #                if r2 < 1.0: # r2 < 1 implies overlapness 
-                #                    d = m.sqrt(r2)
-                #                    V_Excluded_Correction += (m.pi / 12.) * (4 + d) * m.pow((2 - d), 2)
-                #Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
-                #if Volume_Ratio > 1 or Volume_Ratio < 0:
-                #    raise ValueError("Volume Ratio (", Volume_Ratio, ") can't be negative nor greater than one.")
-                #if random() < (V_Excluded - V_Excluded_Correction)/(len(x) + 1) * m.exp(Beta * (ChemPot - Energy_Insertion))
-                #    N_Insertion_Accepted += 1
-                #    x.append(x_Insertion)
-                #    y.append(y_Insertion)
-                #    z.append(z_Insertion)
-                #    Energy += Energy_Insertion
-                #else:
-                #    N_Insertion_Rejected += 1
+def Analytic_Excluded_Volume(L, V, x, y, z):
+    V_Excluded = len(x) * (4. / 3.) * pi * pow(0.5, 3.)
+    """ CORRECTION DUE TO SPHERE OVERLAPNESS """
+    V_Excluded_Correction = 0
+    for j in range(0, len(x), 1):
+        for k in range(j + 1, len(x), 1):
+            Delta_x = x[j] - x[k]
+            Delta_y = y[j] - y[k]
+            Delta_z = z[j] - z[k]
+            r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+            if r2 < 1.0: # r2 < 1 implies overlapness 
+                d = sqrt(r2)
+                V_Excluded_Correction += (pi / 12.) * (4 * 0.5 + d) * pow((2 * 0.5 - d), 2)
+            else:
+                """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
+                if Delta_x > L - 1.: 
+                    Delta_x -= L
+                if Delta_y > L - 1.:
+                    Delta_y -= L
+                if Delta_z > L - 1.:
+                    Delta_z -= L
+                r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+                if r2 < 1.0: # r2 < 1 implies overlapness 
+                    d = sqrt(r2)
+                    V_Excluded_Correction += (pi / 12.) * (4 + d) * pow((2 - d), 2)
+    Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
+    if Volume_Ratio > 1 or Volume_Ratio < 0:
+        raise ValueError("Volume Ratio (%.6f) can't be negative nor greater than one." % Volume_Ratio)
+    #print("V Excluded = %.6f, V_Correction = %.6f, V = %.6f" % (V_Excluded, V_Excluded_Correction, V_Excluded - V_Excluded_Correction))
+    return Volume_Ratio
 
-def Interpolaiton(Pc, l):
+def Interpolation(Pc, l):
     if len(Pc) == 1:
         Pc_Interpolation =  Pc[ list( Pc.keys() )[0] ]
     elif len(Pc) > 1:
