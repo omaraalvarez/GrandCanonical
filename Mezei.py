@@ -21,7 +21,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     start = timer()
     """     CONFIGURATIONAL     STEPS           """
     MC_Relaxation_Steps = 5000
-    MC_Equilibrium_Steps = 25000
+    MC_Equilibrium_Steps = 5000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 100
     """     VARIABLE    INITIALIZATION         """
@@ -110,7 +110,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
         if RN == 2:
             """            INSERTION          """
             N_Insertion += 1
-            Grid = 10
+            Grid = 32
             Delta = L / (Grid + 1)
             EVMPS = ExcludedVolume(L, Grid, Delta, x, y, z)
 
@@ -127,7 +127,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
 
             if np.sum(EVMPS) < pow(Grid, 3):
                 """     INSERTION IN AVAILABLE SPACE    """
-                Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z)                
+                Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Analytic, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z)                
             else:        
                 """     RANDOM INSERTION        """
                 Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected)
@@ -136,14 +136,16 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             """            REMOVAL            """
             N_Removal += 1
             """   Pc[N - 1] IS REQUIRED  """
-            if len(Pc) == 1:
-                Pc_Interpolation = list(Pc.values())[0]
+            if len(Pc_Analytic) == 1:
+                Pc_Interpolation = list(Pc_Analytic.values())[0]
             else:
-                if (len(x) - 1) not in Pc:
+                if (len(x) - 1) not in Pc_Analytic:
                     """     IF Pc[N - 1] IS NOT IN THE ARRAY, AN EXTRAPOLATION OF ITS VALUE IS USED IN THE MEANTIME VIA THE CLOSEST HIGHER AND LOWER VALUE"""
-                    Pc_Interpolation = Interpolation(Pc, len(x))
+                    Pc_Interpolation = Interpolation(Pc_Analytic, len(x))
                 else:
-                    Pc_Interpolation = Pc[len(x) - 1]
+                    Pc_Interpolation = Pc_Analytic[len(x) - 1]
+            if Pc_Interpolation > 1 or Pc_Interpolation < 0:
+                raise ValueError("Invalid value for Pc Interpolation (%.6f)" % Pc_Interpolation)
 
             if random() > pow(1 - Pc_Interpolation, pow(Grid, 3)):
                 Energy, Virial, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
@@ -241,7 +243,7 @@ def Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_A
         N_Insertion_Rejected += 1
     return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
 
-def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z):
+def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Analytic, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z):
     aux1 = np.where(EVMPS == 0)
     j = randrange(0, len(aux1[0]), 1)
     i_x = aux1[0][j]
@@ -260,7 +262,7 @@ def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, 
         Pc_N[len(x)] += 1
         Pc_Sum[len(x)] += 1 - (np.sum(EVMPS) / pow(Grid, 3)) #N_i/N_t
         Pc[len(x)] = Pc_Sum[len(x)] / Pc_N[len(x)]
-    if random() < (V * Pc[len(x)] / (len(x) + 1)) * exp(Beta * (ChemPot - Energy_Insertion)):
+    if random() < (V * Pc_Analytic[len(x)] / (len(x) + 1)) * exp(Beta * (ChemPot - Energy_Insertion)):
         N_Insertion_Accepted += 1
         x.append(x_Insertion)
         y.append(y_Insertion)
