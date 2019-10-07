@@ -12,7 +12,7 @@
 import numpy as np
 import os
 
-from math import exp, log, pow, fmod, pi, sqrt, ceil
+from math import exp, log, pow, fmod, pi, sqrt, ceil, inf
 from random import random, randrange
 from statistics import mean, pstdev
 from timeit import default_timer as timer
@@ -195,15 +195,16 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     g_r += Distribution(L, len(x) / V, R_Cut, r_i, Delta_r, r_values, x, y, z)
                     N_Measurements += 1
                 """ PARTICLE DISPLACEMENT """
-                if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
-                    Displacement *= 1.05
-                else:
-                    Displacement *= 0.95
-                if Displacement < 0.05:
-                    Displacement = 0.05
-                if Displacement > L / 4.:
-                    Displacement = L /4. 
-                N_Displacement, N_Displacement_Accepted = 0, 0
+                if fmod(i, 10*MC_Measurement) == 0:
+                    if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
+                        Displacement *= 1.05
+                    else:
+                        Displacement *= 0.95
+                    if Displacement < 0.05:
+                        Displacement = 0.05
+                    if Displacement > L / 4.:
+                        Displacement = L /4. 
+                    N_Displacement, N_Displacement_Accepted = 0, 0
     
     Average_Energy_File.close()
     Average_Pressure_File.close()
@@ -361,7 +362,15 @@ def Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, Virial, 
     return Energy, Virial, N_Removal_Accepted, N_Removal_Rejected
 
 def u(r2):
-    return 4.0*(pow(1. / r2, 6.0) - pow(1. / r2, 3.))
+    """     SQUARE WELL POTENTIAL       """
+    if r2 <= 1:
+        return inf
+    elif r2 <= pow(1.5, 2):
+        return -1
+    else:
+        return 0
+    """     LENNARD JONES POTENTIAL     """
+    #return 4.0*(pow(1. / r2, 6.0) - pow(1. / r2, 3.))
 
 def rdu(r2):
     return 4.0*(6*pow(1. / r2, 3.0) - 12.0 * pow(1.0 / r2, 6.0))
