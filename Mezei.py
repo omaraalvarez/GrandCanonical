@@ -12,7 +12,7 @@
 import numpy as np
 import os
 
-from math import exp, log, pow, fmod, pi, sqrt
+from math import exp, log, pow, fmod, pi, sqrt, ceil
 from random import random, randrange
 from statistics import mean, pstdev
 from timeit import default_timer as timer
@@ -23,7 +23,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     MC_Relaxation_Steps = 15000
     MC_Equilibrium_Steps = 25000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
-    MC_Measurement = 100
+    MC_Measurement = 10
     """     VARIABLE    INITIALIZATION         """
     x, y, z = [], [], []
     L = pow(V, 1. / 3.)
@@ -37,6 +37,13 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
     Energy, Virial = 0., 0.
     Energy_Array, Pressure_Array, Density_Array = [], [], []
+    r_i = 0.5
+    Delta_r = 0.05
+    N_Measurements = 0
+    r_values = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
+    g_r = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
+    for i in range(ceil( (R_Cut - r_i) / Delta_r)):
+        r_values[i] = r_i + i*Delta_r
     """         PROGRAM     HEADER          """
     print("#" * 40 + "\n#" + " " * 38 + "#")
     print("#" + " " * 4 + "Monte Carlo + Excluded Volume" + " " * 5 + "#" + "\n#" + " " * 38 + "#")
@@ -185,7 +192,8 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Average_Pressure_File.write("%d\t%f\n" % (len(Pressure_Array), mean(Pressure_Array)))
                     Density_Array.append( len(x) / V ) 
                     Average_Density_File.write("%d\t%f\n" % (len(Density_Array), mean(Density_Array) ))
-
+                    g_r += Distribution(L, len(x) / V, R_Cut, r_i, Delta_r, r_values, x, y, z)
+                    N_Measurements += 1
                 """ PARTICLE DISPLACEMENT """
                 if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
                     Displacement *= 1.05
@@ -202,10 +210,19 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Average_Density_File.close()
     """     CAVITY PROBABILITIES OUTPUT     """
     Pc_File = open("%s/Pc.dat" % Output_Route, "w+")
+    Pc_File.write("#N\t#Pc\n" )
     for i in Pc_Random:
         #Pc_File.write("%d\t%.6f\t%.6f\t%.6f\n" % (i, Pc[i], Pc_Analytic[i], Pc_Random[i]))
         Pc_File.write("%d\t%.6f\n" % (i, Pc_Random[i]))
     Pc_File.close()
+
+    """     RADIAL DISTRIBUTION OUTPUT      """
+    g_r = [x / N_Measurements for x in g_r]
+    g_r_File = open("%s/RadialDistribution.dat" % Output_Route, "w+")
+    g_r_File.write("#r\t#g_r\n")
+    for i in range( ceil((R_Cut - r_i) / Delta_r)):
+        g_r_File.write("%.6f\t%.6f\n" % (r_values[i], g_r[i]))
+    g_r_File.close()
 
     print("< E / N > = %.6f + %.6f" % (mean(Energy_Array), pstdev(Energy_Array)) )
     print("< P > = %.6f + %.6f" % (mean(Pressure_Array), pstdev(Pressure_Array)) )
@@ -283,6 +300,7 @@ def Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial
         N_Insertion_Rejected += 1
     return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
 
+
 #def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z):
 #    aux1 = np.where(EVMPS == 0)
 #    j = randrange(0, len(aux1[0]), 1)
@@ -312,6 +330,7 @@ def Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial
 #    else:
 #        N_Insertion_Rejected += 1
 #    return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
+
 
 def Removal(L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z):
     j = randrange(0, len(x), 1)
@@ -371,54 +390,57 @@ def PeriodicBoundaryConditions(L, x):
     
     return x
 
-def Grid_Excluded_Volume(L, Grid, Delta, x, y, z):
-    EVMPS = np.zeros((Grid, Grid, Grid))
-    for i_x in range(0, Grid, 1):
-        for i_y in range(0, Grid, 1):
-            for i_z in range(0, Grid, 1):
-                x_Grid = (i_x + 1) * Delta - L / 2.
-                y_Grid = (i_y + 1) * Delta - L / 2.
-                z_Grid = (i_z + 1) * Delta - L / 2.
-                for k in range(0, len(x), 1):
-                    Delta_x = x_Grid - x[k]
-                    Delta_y = y_Grid - y[k]
-                    Delta_z = z_Grid - z[k]
-                    r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
-                    if r2 < pow(0.7, 2):
-                        EVMPS[i_x, i_y, i_z] = 1
-                        break
-    return EVMPS
+#def Grid_Excluded_Volume(L, Grid, Delta, x, y, z):
+#    EVMPS = np.zeros((Grid, Grid, Grid))
+#    for i_x in range(0, Grid, 1):
+#        for i_y in range(0, Grid, 1):
+#            for i_z in range(0, Grid, 1):
+#                x_Grid = (i_x + 1) * Delta - L / 2.
+#                y_Grid = (i_y + 1) * Delta - L / 2.
+#                z_Grid = (i_z + 1) * Delta - L / 2.
+#                for k in range(0, len(x), 1):
+#                    Delta_x = x_Grid - x[k]
+#                    Delta_y = y_Grid - y[k]
+#                    Delta_z = z_Grid - z[k]
+#                    r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+#                    if r2 < pow(0.7, 2):
+#                        EVMPS[i_x, i_y, i_z] = 1
+#                        break
+#    return EVMPS
 
-def Analytic_Excluded_Volume(L, V, x, y, z):
-    V_Excluded = len(x) * (4. / 3.) * pi * pow(0.5, 3.)
-    """ CORRECTION DUE TO SPHERE OVERLAPNESS """
-    V_Excluded_Correction = 0
-    for j in range(0, len(x), 1):
-        for k in range(j + 1, len(x), 1):
-            Delta_x = x[j] - x[k]
-            Delta_y = y[j] - y[k]
-            Delta_z = z[j] - z[k]
-            r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
-            if r2 < pow(0.7, 2): # r2 < 1 implies overlapness 
-                d = sqrt(r2)
-                V_Excluded_Correction += (pi / 12.) * (4 * 0.7 + d) * pow((2 * 0.7 - d), 2)
-            else:
-                """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
-                if Delta_x > L - 1.: 
-                    Delta_x -= L
-                if Delta_y > L - 1.:
-                    Delta_y -= L
-                if Delta_z > L - 1.:
-                    Delta_z -= L
-                r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
-                if r2 < pow(0.7, 2): # r2 < 1 implies overlapness 
-                    d = sqrt(r2)
-                    V_Excluded_Correction += (pi / 12.) * (4 * 0.7 + d) * pow((2 * 0.7 - d), 2)
-    Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
-    if Volume_Ratio > 1 or Volume_Ratio < 0:
-        raise ValueError("Volume Ratio (%.6f) can't be negative nor greater than one." % Volume_Ratio)
-    #print("V Excluded = %.6f, V_Correction = %.6f, V = %.6f" % (V_Excluded, V_Excluded_Correction, V_Excluded - V_Excluded_Correction))
-    return 1 - Volume_Ratio
+
+
+#def Analytic_Excluded_Volume(L, V, x, y, z):
+#    V_Excluded = len(x) * (4. / 3.) * pi * pow(0.5, 3.)
+#    """ CORRECTION DUE TO SPHERE OVERLAPNESS """
+#    V_Excluded_Correction = 0
+#    for j in range(0, len(x), 1):
+#        for k in range(j + 1, len(x), 1):
+#            Delta_x = x[j] - x[k]
+#            Delta_y = y[j] - y[k]
+#            Delta_z = z[j] - z[k]
+#            r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+#            if r2 < pow(0.7, 2): # r2 < 1 implies overlapness 
+#                d = sqrt(r2)
+#                V_Excluded_Correction += (pi / 12.) * (4 * 0.7 + d) * pow((2 * 0.7 - d), 2)
+#            else:
+#                """  PERIODIC BOUNDARY CONDITION FOR THE OVERLAPNESS CONTRIBUTION  """
+#                if Delta_x > L - 1.: 
+#                    Delta_x -= L
+#                if Delta_y > L - 1.:
+#                    Delta_y -= L
+#                if Delta_z > L - 1.:
+#                    Delta_z -= L
+#                r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+#                if r2 < pow(0.7, 2): # r2 < 1 implies overlapness 
+#                    d = sqrt(r2)
+#                    V_Excluded_Correction += (pi / 12.) * (4 * 0.7 + d) * pow((2 * 0.7 - d), 2)
+#    Volume_Ratio = (V_Excluded - V_Excluded_Correction) / V
+#    if Volume_Ratio > 1 or Volume_Ratio < 0:
+#        raise ValueError("Volume Ratio (%.6f) can't be negative nor greater than one." % Volume_Ratio)
+#    #print("V Excluded = %.6f, V_Correction = %.6f, V = %.6f" % (V_Excluded, V_Excluded_Correction, V_Excluded - V_Excluded_Correction))
+#    return 1 - Volume_Ratio
+
 
 def Random_Excluded_Volume(L, x, y, z):
     N_Random = 1000
@@ -476,5 +498,23 @@ def Interpolation(Pc, l):
 
     Pc_Interpolation = Pc[lim_inf] * ((1 - l - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((l - lim_inf) / (lim_sup - lim_inf))
     return Pc_Interpolation
+
+def Distribution(L, Density, R_Cut, r_i, Delta_r, r_values, x, y, z):
+    g_r = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
+    for l in range(ceil( (R_Cut - r_i) / Delta_r )):
+        n = 0
+        for i in range(len(x)):
+            for j in range(len(x)):
+                Delta_x = x[i] - x[j]
+                Delta_x = PeriodicBoundaryConditions(L, Delta_x)
+                Delta_y = y[i] - y[j]
+                Delta_y = PeriodicBoundaryConditions(L, Delta_y)
+                Delta_z = z[i] - z[j]
+                Delta_z = PeriodicBoundaryConditions(L, Delta_z)
+                r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+                if pow(r_values[l], 2) >= r2 and r2 >= pow(r_values[l] - Delta_r, 2):
+                    n += 1
+        g_r[l] = n / (4 * pi * pow(r_values[l], 2) * Delta_r * len(x) * Density)
+    return g_r
 
 Mezei(17.9183589140279, 250.058699225, 4.0)
