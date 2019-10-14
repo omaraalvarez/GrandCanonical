@@ -21,7 +21,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     start = timer()
     """     CONFIGURATIONAL     STEPS           """
     MC_Relaxation_Steps = 15000
-    MC_Equilibrium_Steps = 25000
+    MC_Equilibrium_Steps = 50000
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps
     MC_Measurement = 10
     """     VARIABLE    INITIALIZATION         """
@@ -37,13 +37,10 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
     Energy, Virial = 0., 0.
     Energy_Array, Pressure_Array, Density_Array = [], [], []
-    r_i = 0.5
-    Delta_r = 0.05
     N_Measurements = 0
-    r_values = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
-    g_r = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
-    for i in range(ceil( (R_Cut - r_i) / Delta_r)):
-        r_values[i] = r_i + i*Delta_r
+    N_Bins = 100
+    g_r = np.zeros(N_Bins, dtype = float)
+
     """         PROGRAM     HEADER          """
     print("#" * 40 + "\n#" + " " * 38 + "#")
     print("#" + " " * 4 + "Monte Carlo + Excluded Volume" + " " * 5 + "#" + "\n#" + " " * 38 + "#")
@@ -52,6 +49,8 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Output_Route = "Output/ChPot_%.3f_T_%.2f" % (ChemPot, T)
     if not os.path.exists(Output_Route):
         os.makedirs(Output_Route)
+    if not os.path.exists("%s/Positions" % Output_Route):
+        os.makedirs("%s/Positions" % Output_Route)
     Average_Energy_File = open("%s/Average_Energy.dat" % Output_Route, "w+")
     Average_Energy_File.write("#\t< E / N >\n")
     Average_Pressure_File = open("%s/Average_Pressure.dat" % Output_Route, "w+")
@@ -83,7 +82,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
             N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0
 
         if i > 0 and i > MC_Relaxation_Steps and i % int(0.01 * (MC_Steps - MC_Relaxation_Steps)) == 0:
-            print("%d%% Equilibrium" % (100*(i - MC_Relaxation_Steps) / (MC_Equilibrium_Steps)))
+            print("%d%% Equilibrium (%d Measurements)" % (100*(i - MC_Relaxation_Steps) / (MC_Equilibrium_Steps), N_Measurements))
             print("U / N = %.6f" % (Energy/len(x)) )
             print("P = %.6f" % ((len(x) * T  - Virial / 3.0) / V) )
             print("N = %d" % len(x))
@@ -192,8 +191,14 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                     Average_Pressure_File.write("%d\t%f\n" % (len(Pressure_Array), mean(Pressure_Array)))
                     Density_Array.append( len(x) / V ) 
                     Average_Density_File.write("%d\t%f\n" % (len(Density_Array), mean(Density_Array) ))
-                    g_r += Distribution(L, len(x) / V, R_Cut, r_i, Delta_r, r_values, x, y, z)
+                    g_r += Distribution(N_Bins, L, len(x) / V, x, y, z)
+                    #g_r += Distribution(L, len(x) / V, R_Cut, r_i, Delta_r, r_values, x, y, z)
                     N_Measurements += 1
+                    Positions_File = open("%s/Positions/Pos_%d.xyz" % (Output_Route, N_Measurements), "w+")
+                    for i in range(len(x) - 1):
+                        Positions_File.write("%.6f,\t%.6f,\t%.6f,\n" % (x[i], y[i], z[i]))
+                    Positions_File.write("%.6f,\t%.6f,\t%.6f\n" % (x[i], y[i], z[i]))
+                    Positions_File.close()
                 """ PARTICLE DISPLACEMENT """
                 if fmod(i, 10*MC_Measurement) == 0:
                     if 1. * N_Displacement_Accepted / N_Displacement > 0.55:
@@ -219,10 +224,11 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
 
     """     RADIAL DISTRIBUTION OUTPUT      """
     g_r = [x / N_Measurements for x in g_r]
+    Delta = L / (2 * N_Bins)
     g_r_File = open("%s/RadialDistribution.dat" % Output_Route, "w+")
     g_r_File.write("#r\t#g_r\n")
-    for i in range( ceil((R_Cut - r_i) / Delta_r)):
-        g_r_File.write("%.6f\t%.6f\n" % (r_values[i], g_r[i]))
+    for i in range(N_Bins - 1):
+        g_r_File.write( "%.6f\t%.6f\n" % ( (i + 1.5) * Delta, g_r[i]) )
     g_r_File.close()
 
     print("< E / N > = %.6f + %.6f" % (mean(Energy_Array), pstdev(Energy_Array)) )
@@ -300,7 +306,6 @@ def Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial
     else:
         N_Insertion_Rejected += 1
     return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
-
 
 #def Insertion_Mezei(EVMPS, Beta, ChemPot, Grid, Delta, L, V, R_Cut, Pc, Pc_Sum, Pc_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z):
 #    aux1 = np.where(EVMPS == 0)
@@ -392,11 +397,10 @@ def Energy_Virial(L, R_Cut, rx, ry, rz, x, y, z):
     return Energy, Virial
 
 def PeriodicBoundaryConditions(L, x):
-    if x <  -L / 2.:
+    if x < -L / 2.:
         x += L
     elif x > L / 2.:
         x -= L
-    
     return x
 
 #def Grid_Excluded_Volume(L, Grid, Delta, x, y, z):
@@ -508,22 +512,27 @@ def Interpolation(Pc, l):
     Pc_Interpolation = Pc[lim_inf] * ((1 - l - lim_inf) / (lim_sup - lim_inf)) + Pc[lim_sup] * ((l - lim_inf) / (lim_sup - lim_inf))
     return Pc_Interpolation
 
-def Distribution(L, Density, R_Cut, r_i, Delta_r, r_values, x, y, z):
-    g_r = np.zeros(ceil( (R_Cut - r_i) / Delta_r), dtype = float)
-    for l in range(ceil( (R_Cut - r_i) / Delta_r )):
-        n = 0
-        for i in range(len(x)):
-            for j in range(len(x)):
-                Delta_x = x[i] - x[j]
-                Delta_x = PeriodicBoundaryConditions(L, Delta_x)
-                Delta_y = y[i] - y[j]
-                Delta_y = PeriodicBoundaryConditions(L, Delta_y)
-                Delta_z = z[i] - z[j]
-                Delta_z = PeriodicBoundaryConditions(L, Delta_z)
-                r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
-                if pow(r_values[l], 2) >= r2 and r2 >= pow(r_values[l] - Delta_r, 2):
-                    n += 1
-        g_r[l] = n / (4 * pi * pow(r_values[l], 2) * Delta_r * len(x) * Density)
+def Distribution(N_Bins, L, Density, x, y, z):
+    Delta = L / (2 * N_Bins)
+    g_r = np.zeros(N_Bins, dtype = float)
+    for i in range( len(x) - 1 ):
+        for j in range( i, len(x) ):
+            Delta_x = x[i] - x[j]
+            Delta_x = PeriodicBoundaryConditions(L, Delta_x)
+            Delta_y = y[i] - y[j]
+            Delta_y = PeriodicBoundaryConditions(L, Delta_y)
+            Delta_z = z[i] - z[j]
+            Delta_z = PeriodicBoundaryConditions(L, Delta_z)
+            r2 = pow(Delta_x, 2) + pow(Delta_y, 2) + pow(Delta_z, 2)
+            if r2 < pow(L / 2, 2):
+                l = int(sqrt(r2) / Delta) - 1
+                g_r[l] += 2
+    for l in range(1, N_Bins):
+        #g_r[l] = g_r[l] / ( len(x) * (4 / 3) * pi * ( pow(l + 2, 3) - pow(l + 1, 3) ) * pow(Delta, 3) * Density  )
+        g_r[l] = g_r[l] / ( len(x) * 4 * pi * pow(l * Delta, 2) * Delta * Density  )
     return g_r
 
-Mezei(17.9183589140279, 250.058699225, 4.0)
+
+
+
+Mezei(17.9183589140279, 1000, 4.0)
