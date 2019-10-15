@@ -150,7 +150,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
                 Pc_Random_Sum[len(x)] += Volume_Ratio
                 Pc_Random[len(x)] = Pc_Random_Sum[len(x)] / Pc_Random_N[len(x)]
 
-            if len(x) > 0:
+            if Volume_Ratio > 0:
                 """     INSERTION IN AVAILABLE SPACE    """
                 Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Pc_Random, Pc_Random_Sum, Pc_Random_N, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion)                
             else:        
@@ -216,7 +216,7 @@ def Mezei(ChemPot, V, T, R_Cut = 3.0):
     Average_Density_File.close()
     """     CAVITY PROBABILITIES OUTPUT     """
     Pc_File = open("%s/Pc.dat" % Output_Route, "w+")
-    Pc_File.write("#N\t#Pc\n" )
+    Pc_File.write("#N\t#Pc\n")
     for i in Pc_Random:
         #Pc_File.write("%d\t%.6f\t%.6f\t%.6f\n" % (i, Pc[i], Pc_Analytic[i], Pc_Random[i]))
         Pc_File.write("%d\t%.6f\n" % (i, Pc_Random[i]))
@@ -454,7 +454,6 @@ def PeriodicBoundaryConditions(L, x):
 #    #print("V Excluded = %.6f, V_Correction = %.6f, V = %.6f" % (V_Excluded, V_Excluded_Correction, V_Excluded - V_Excluded_Correction))
 #    return 1 - Volume_Ratio
 
-
 def Random_Excluded_Volume(L, x, y, z):
     N_Random = 1000
     N_in = 0
@@ -531,8 +530,5 @@ def Distribution(N_Bins, L, Density, x, y, z):
         #g_r[l] = g_r[l] / ( len(x) * (4 / 3) * pi * ( pow(l + 2, 3) - pow(l + 1, 3) ) * pow(Delta, 3) * Density  )
         g_r[l] = g_r[l] / ( len(x) * 4 * pi * pow(l * Delta, 2) * Delta * Density  )
     return g_r
-
-
-
 
 Mezei(17.9183589140279, 1000, 4.0)
