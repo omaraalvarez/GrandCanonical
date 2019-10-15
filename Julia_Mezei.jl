@@ -36,9 +36,9 @@ function Mezei(ChemPot, V, T, R_Cut = 3.)
         if i < MC_Relaxation_Steps && i % .01MC_Relaxation_Steps == 0
             println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation")
             println("U / N = $(round(Energy / length(x), digits = 6))")
-            println("P = $(round(length(x) * T - Virial / 3. / V))")
-            println("N = $length(x)")
-            println("Density = $(len(x) / V)")
+            println("P = $(round(length(x) * T - Virial / 3. / V, digits = 6))")
+            println("N = $(length(x))")
+            println("Density = $(round(length(x) / V, digits = 6))")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted")
             println("   Rejected: $N_Movement_Rejected")
@@ -55,8 +55,37 @@ function Mezei(ChemPot, V, T, R_Cut = 3.)
         end
 
         if i > MC_Relaxation_Steps && i % .01MC_Equilibrium_Steps == 0
-            
+            println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements).")
+            println("U / N = $(round(Energy / length(x), digits = 6))")
+            println("P = $(round(length(x) * T - Virial / 3. / V, digits = 6))")
+            println("N = $(length(x))")
+            println("Density = $(round(length(x) / V, digits = 6))")
+            println("Movements: $N_Movement")
+            println("   Accepted: $N_Movement_Accepted")
+            println("   Rejected: $N_Movement_Rejected")
+            println("Insertions: $N_Insertion")
+            println("   Accepted: $N_Insertion_Accepted")
+            println("   Rejected: $N_Insertion_Rejected")
+            println("Removal: $N_Removal")
+            println("   Accepted: $N_Removal_Accepted")
+            println("   Rejected: $N_Removal_Rejected")
+            println("")
+            N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
+            N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
+            N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
         end
+        i == MC_Relaxation_Steps ? println("~~~    STARTING MEASUREMENT STEPS    ~~~") : nothing
+        RN = rand(1:3);
+        if RN == 1 && length(x) > 1
+            N_Movement += 1;
+            N_Displacement += 1;
+            Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
+        end
+        if RN == 2
+            N_Insertion += 1;
+            Volume_Ratio, x_Insertion, y_Insertion, z_Insertion = Random_Excluded_Volume(L, x, y, z)
+        end
+
     end
 end
 
