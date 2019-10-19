@@ -531,4 +531,4 @@ def Distribution(N_Bins, L, Density, x, y, z):
         g_r[l] = g_r[l] / ( len(x) * 4 * pi * pow(l * Delta, 2) * Delta * Density  )
     return g_r
 
-Mezei(17.9183589140279, 1000, 4.0)
+Mezei(-3., 250., 2.0)
