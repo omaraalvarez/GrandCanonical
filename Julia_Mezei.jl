@@ -238,6 +238,7 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
 
     Povray_ini(ChemPot, T, convert(Int64, N_Measurements / 100))
     Povray_Pov(L, ChemPot, T)
+    run(`povray $Output_Route/Positions/MC_Animation.ini`)
 end
 
 function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Float64, Virial::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
@@ -558,7 +559,7 @@ function Povray_Pov(L::Float64, ChemPot::Float64, T::Float64)
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
     println(Pov_File, "#default { finish {ambient .8 diffuse 1 specular 1 roughness .005 metallic 0.7} }\n")
-    println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-1.6L), 0>\n\tlook_at <0, 0, 0>\n}\n")
+    println(Pov_File, "camera {\n\tperspective\n\tlocation <0, $(-1.55L), 0>\n\tlook_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<0, $(-5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<0, $(+5L), 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
     println(Pov_File, "light_source {\n\t<$(-5L), 0, 0>\n\tcolor rgb <0.3, 0.3, 0.3>\n\tfade_distance $(10L)\n\tfade_power 0\n\tparallel\n\tpoint_at <0, 0, 0>\n}\n")
@@ -570,7 +571,7 @@ function Povray_Pov(L::Float64, ChemPot::Float64, T::Float64)
         union {\n\t\ttriangle {\n\t\t\t<L / 2, -L / 2, h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <L / 2, -L / 2, -h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t}\n\n\t
         union {\n\t\ttriangle {\n\t\t\t<L / 2, L / 2, -h /2>, <L / 2, L / 2, h / 2>, <-L / 2, L / 2, -h /2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\ntriangle {\n\t\t\t<-L / 2, L / 2, -h /2>, <-L / 2, L / 2, h / 2>, <L / 2, L / 2, h / 2>\n\t\t\tpigment { rgbt <0.75, 0.75, 0.75, 0.5> }\n\t\t}\n\t}\n#end")
     println(Pov_File, "#declare L = $L;\n#declare h = $L;")
-    println(Pov_File, """#fopen File_Positions concat("Pos_", str(clock, 1, 0), ".xyz") read""")
+    println(Pov_File, """#fopen File_Positions concat("$Output_Route/Pos_", str(clock, 1, 0), ".xyz") read""")
     println(Pov_File, "\t#while (defined( File_Positions ))\n\t\t#read (File_Positions, rx, ry, rz)\n\t\tParticle(rx, ry, -rz)\n\t\t#declare PBC = false;\n\t\t#if (rx > (L - 1) / 2)\n\t\t\t#declare rx = rx - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (rx < -(L - 1) / 2)\n\t\t\t#declare rx = rx + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t
         #if (ry > (L - 1) / 2)\n\t\t\t#declare ry = ry - L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (ry < -(L - 1) / 2)\n\t\t\t#declare ry = ry + L;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (rz > (h - 1) / 2)\n\t\t\t#declare rz = rx - h;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (rz < -(h - 1) / 2)\n\t\t\t#declare rz = rz + h;\n\t\t\t#declare PBC = true;\n\t\t#end\n\t\t#if (PBC)\n\t\t\tParticle(rx, ry, -rz)\n\t\t#end\n\t#end\n#fclose File")
     println(Pov_File, "Walls(L, h)\nBox(L, h)")
@@ -581,8 +582,8 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
     Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/MC_Animation.ini", "w");
-    println(Ini_File, "Input_File_Name = MC_Animation.pov")
-    println(Ini_File, "+W800 +H600")
+    println(Ini_File, "Input_File_Name = $Output_Route/MC_Animation.pov")
+    println(Ini_File, "+W800 +H800")
     println(Ini_File, "")
     println(Ini_File, "Initial_Frame = 1")
     println(Ini_File, "Final_Frame = $Frames")
@@ -593,4 +594,4 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
     close(Ini_File)
 end
 
-@time Mezei(-3., 5000., 2.)
+@time Mezei(-3., 250., 2.)
