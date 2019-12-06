@@ -1,41 +1,47 @@
 using Statistics;
 using Plots;
+using CSV;
 
-function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
+function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 50_000;
-    MC_Equilibrium_Steps = 250_000;
+    MC_Relaxation_Steps = 2_500_000;
+    MC_Equilibrium_Steps = 10_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    MC_Measurement = 50;
     """     VARIABLE INITIALIZATION     """
     Overlap = 1.0;
+    σ_p, λ_p = 0.5, 1.5;
     x, y, z = Float64[], Float64[], Float64[];
-    L = V^(1. / 3.)
+    V = L ^ 3.;
+    MC_Measurement = convert(Int64, floor(V / (10 * (4. / 3.) * π * σ_p^3 )));
     Beta = 1. / T
     Pc, Pc_Sum, Pc_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
+    #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
+    #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     Displacement, N_Displacement, N_Displacement_Accepted = L / 8., 0, 0;
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
-    Energy, Virial, N_Measurements = 0., 0., 0;
-    Energy_Sum, Pressure_Sum, Density_Sum = 0., 0., 0.;
-    Energy_Array, Pressure_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    Average_Energy_Array, Average_Pressure_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    N_Bins = 100;
+    Energy, N_Measurements = 0., 0;
+    Energy_Sum, Density_Sum = 0., 0.;
+    Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    #Energy, Virial, N_Measurements = 0., 0., 0;
+    #Energy_Sum, Pressure_Sum, Density_Sum = 0., 0., 0.;
+    #Energy_Array, Pressure_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    #Average_Energy_Array, Average_Pressure_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    N_Bins = 150;
     g_r = zeros(Float64, N_Bins);
     """     OUTPUT FILES        """
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))"
+    Output_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))"
     mkpath("$Output_Route/Positions")
     Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
     println(Average_Energy_File, "#\t< E / N >")
     Energy_File = open("$Output_Route/Energy.dat", "w");
     println(Energy_File, "#\tE / N ")
-    Average_Pressure_File = open("$Output_Route/Average_Pressure.dat", "w");
-    println(Average_Pressure_File, "#\t< P >")
-    Pressure_File = open("$Output_Route/Pressure.dat", "w");
-    println(Pressure_File, "#\tP")
+    #Average_Pressure_File = open("$Output_Route/Average_Pressure.dat", "w");
+    #println(Average_Pressure_File, "#\t< P >")
+    #Pressure_File = open("$Output_Route/Pressure.dat", "w");
+    #println(Pressure_File, "#\tP")
     Average_Density_File = open("$Output_Route/Average_Density.dat", "w");
     println(Average_Density_File, "#\t< Density >")
     Density_File = open("$Output_Route/Density.dat", "w");
@@ -46,7 +52,7 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
         if i < MC_Relaxation_Steps && i % .01MC_Relaxation_Steps == 0
             println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation")
             println("U / N = $(round(Energy / length(x), digits = 6))")
-            println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
+            #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
             println("Movements: $N_Movement")
@@ -67,7 +73,7 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
         if i > MC_Relaxation_Steps && i % .01MC_Equilibrium_Steps == 0
             println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements).")
             println("U / N = $(round(Energy / length(x), digits = 6))")
-            println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
+            #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
             println("Movements: $N_Movement")
@@ -90,17 +96,18 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
         if RN == 1 && length(x) > 1
             N_Movement += 1;
             N_Displacement += 1;
-            Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
+            Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(L, Beta, Displacement, Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
+            #Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted = Movement(L, Beta, Displacement, Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted, R_Cut, x, y, z)
         end
         if RN == 2
             N_Insertion += 1;
-            Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Grid_Excluded_Volume(Overlap, L, Pc_Grid, Pc_Grid_Sum, Pc_Grid_N, x, y, z)
+            #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Grid_Excluded_Volume(Overlap, L, Pc_Grid, Pc_Grid_Sum, Pc_Grid_N, x, y, z)
             Pc, Pc_Sum, Pc_N, x_Insertion, y_Insertion, z_Insertion = Random_Excluded_Volume(Overlap, L, Pc, Pc_Sum, Pc_N, x, y, z)
-            Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Analytic_Excluded_Volume(Overlap, L, V, Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N, x, y, z)
+            #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Analytic_Excluded_Volume(Overlap, L, V, Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N, x, y, z)
             if length(x_Insertion) > 0
-                Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion, Pc)
+                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion_Mezei(Beta, ChemPot, L, V, R_Cut, Energy, N_Insertion_Accepted, N_Insertion_Rejected, x, y, z, x_Insertion, y_Insertion, z_Insertion, Pc)
             else
-                Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected)
+                Energy, N_Insertion_Accepted, N_Insertion_Rejected = Insertion(L, V, ChemPot, Beta, R_Cut, x, y, z, Energy, N_Insertion_Accepted, N_Insertion_Rejected)
             end
         end
         if RN == 3 && length(x) > 1
@@ -115,9 +122,9 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
                 end
             end
             if rand() > (1 - Pc_Interpolation)^1000
-                Energy, Virial, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z);
+                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal_Mezei(Pc_Interpolation, L, V, Beta, ChemPot, R_Cut, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z);
             else
-                Energy, Virial, N_Removal_Accepted, N_Removal_Rejected = Removal(L, V, Beta, ChemPot, R_Cut, Energy, Virial, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
+                Energy, N_Removal_Accepted, N_Removal_Rejected = Removal(L, V, Beta, ChemPot, R_Cut, Energy, N_Removal_Accepted, N_Removal_Rejected, x, y, z)
             end
         end
         if i % MC_Measurement == 0
@@ -128,17 +135,17 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
                 Energy_Sum += Energy / length(x);
                 Average_Energy_Array[N_Measurements] = Energy_Sum / N_Measurements;
                 println(Average_Energy_File, "$N_Measurements\t$(round(Average_Energy_Array[N_Measurements], digits = 6))")
-                Pressure_Array[N_Measurements] = (length(x) * T - Virial / 3.) / V
-                println(Pressure_File, "$N_Measurements\t$(round(Pressure_Array[N_Measurements], digits = 6))")
-                Pressure_Sum += (length(x) * T - Virial / 3.) / V;
-                Average_Pressure_Array[N_Measurements] = Pressure_Sum / N_Measurements;
-                println(Average_Pressure_File, "$N_Measurements\t$(round(Average_Pressure_Array[N_Measurements], digits = 6))")
+                #Pressure_Array[N_Measurements] = (length(x) * T - Virial / 3.) / V
+                #println(Pressure_File, "$N_Measurements\t$(round(Pressure_Array[N_Measurements], digits = 6))")
+                #Pressure_Sum += (length(x) * T - Virial / 3.) / V;
+                #Average_Pressure_Array[N_Measurements] = Pressure_Sum / N_Measurements;
+                #println(Average_Pressure_File, "$N_Measurements\t$(round(Average_Pressure_Array[N_Measurements], digits = 6))")
                 Density_Array[N_Measurements] = length(x) / V;
                 println(Density_File, "$N_Measurements\t$(round(Density_Array[N_Measurements], digits = 6))")
                 Density_Sum += length(x) / V;
                 Average_Density_Array[N_Measurements] = Density_Sum / N_Measurements;
                 println(Average_Density_File, "$N_Measurements\t$(round(Average_Density_Array[N_Measurements], digits = 6))")
-                g_r += Distribution(N_Bins, L, length(x) / V, x, y, z)
+                g_r += Distribution(N_Bins, L, length(x) / V, x, y, z, R_Cut)
                 if N_Measurements % 100 == 0
                     Positions_File = open("$Output_Route/Positions/Pos_$(convert(Int64, N_Measurements / 100)).xyz", "w");
                     for i = 1:length(x)
@@ -155,11 +162,12 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
         end
     end
     close(Average_Energy_File)
-    close(Average_Pressure_File)
+    #close(Average_Pressure_File)
     close(Average_Density_File)
     
     g_r /= N_Measurements;
-    Delta = L / (2N_Bins);
+    #Delta = L / (2N_Bins);
+    Delta = R_Cut / N_Bins;
     r = zeros(Float64, N_Bins - 1)
     g_r_File = open("$Output_Route/Radial_Distribution.dat", "w");
     println(Average_Energy_File, "#r\t#Normalized Density\n")
@@ -177,73 +185,76 @@ function Mezei(ChemPot::Float64, V::Float64, T::Float64, R_Cut::Float64 = 3.)
     Pc_File = open("$Output_Route/Pc.dat", "w");
     println(Pc_File, "#N\t#Pc_Random\t#Pc_Grid\t#Pc_Analytic")
     Pc_Array = zeros(Float64, length(Pc) - 1)
-    Pc_Grid_Array = zeros(Float64, length(Pc) - 1)
-    Pc_Analytic_Array = zeros(Float64, length(Pc) - 1)
+    #Pc_Grid_Array = zeros(Float64, length(Pc) - 1)
+    #Pc_Analytic_Array = zeros(Float64, length(Pc) - 1)
     @inbounds for i in keys(Pc)
         if i != 0
             Pc_Array[i] = Pc[i];
-            Pc_Grid_Array[i] = Pc_Grid[i];
-            Pc_Analytic_Array[i] = Pc_Analytic[i];
+            #Pc_Grid_Array[i] = Pc_Grid[i];
+            #Pc_Analytic_Array[i] = Pc_Analytic[i];
         end
     end
     for i = 1:length(Pc_Array)
-        println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))\t$(round(Pc_Grid_Array[i], digits = 6))\t$(round(Pc_Analytic_Array[i], digits = 6))")
+        println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))")
+        #println(Pc_File, "$i\t$(round(Pc_Array[i], digits = 6))\t$(round(Pc_Grid_Array[i], digits = 6))\t$(round(Pc_Analytic_Array[i], digits = 6))")
     end
     close(Pc_File)
     Pc_Plot = plot(Pc_Array, label = "Random", xlabel = "N", ylabel = "Cavity Probability", ylims = (0, 1), width = 3, size = [1200, 800])
-    plot!(Pc_Grid_Array, label = "Grid", width = 3)
-    plot!(Pc_Analytic_Array, label = "Analytic", width = 3)
+    #plot!(Pc_Grid_Array, label = "Grid", width = 3)
+    #plot!(Pc_Analytic_Array, label = "Analytic", width = 3)
     savefig(Pc_Plot, "$Output_Route/Pc")
 
-    println("< E / N > = $(round(mean(Energy_Array), digits = 6)) ± $(round(std(Energy_Array), digits = 6))")
-    Energy_Plot = plot(Energy_Array, legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 2, size = [1200, 800])
-    hline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
+    println("< E / N > = $(round(mean(Energy_Array[1:end - 1]), digits = 6)) ± $(round(std(Energy_Array[1:end - 1]), digits = 6))")
+    Energy_Plot = plot(Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 2, size = [1200, 800])
+    hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Plot, "$Output_Route/Energy")
-    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
-    vline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
+    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    vline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Histogram, "$Output_Route/Energy_Histogram")
-    Average_Energy_Plot = plot(Average_Energy_Array, legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
-    hline!([mean(Energy_Array)], color = :black, width = 2, linestyle = :dash)
+    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
+    hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Energy_Plot, "$Output_Route/Average_Energy")
 
-    println("< P > = $(round(mean(Pressure_Array), digits = 6)) ± $(round(std(Pressure_Array), digits = 6))")
-    Pressure_Plot = plot(Pressure_Array, legend = false, xlabel = "Measurements", ylabel = "Pressure [Unitless]", width = 2, size = [1200, 800])
-    hline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
-    savefig(Pressure_Plot, "$Output_Route/Pressure")
-    Pressure_Histogram = histogram(Pressure_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Pressure [Unitless]", ylabel = "Frequency", size = [1200, 800])
-    vline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
-    savefig(Pressure_Histogram, "$Output_Route/Pressure_Histogram")
-    Average_Pressure_Plot = plot(Average_Pressure_Array, legend = false, xlabel = "Measurements", ylabel = "< Pressure > [Unitless]", width = 3, size = [1200, 800])
-    hline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
-    savefig(Average_Pressure_Plot, "$Output_Route/Average_Pressure")
+    #println("< P > = $(round(mean(Pressure_Array), digits = 6)) ± $(round(std(Pressure_Array), digits = 6))")
+    #Pressure_Plot = plot(Pressure_Array, legend = false, xlabel = "Measurements", ylabel = "Pressure [Unitless]", width = 2, size = [1200, 800])
+    #hline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
+    #savefig(Pressure_Plot, "$Output_Route/Pressure")
+    #Pressure_Histogram = histogram(Pressure_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Pressure [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    #vline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
+    #savefig(Pressure_Histogram, "$Output_Route/Pressure_Histogram")
+    #Average_Pressure_Plot = plot(Average_Pressure_Array, legend = false, xlabel = "Measurements", ylabel = "< Pressure > [Unitless]", width = 3, size = [1200, 800])
+    #hline!([mean(Pressure_Array)], color = :black, width = 2, linestyle = :dash)
+    #savefig(Average_Pressure_Plot, "$Output_Route/Average_Pressure")
 
-    println("< N > = $(round(V*mean(Density_Array), digits = 6)) ± $(round(V*std(Density_Array), digits = 6))")
-    println("< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
-    Density_Plot = plot(Density_Array, legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 2, size = [1200, 800])
-    hline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    println("< N > = $(round(V*mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(V*std(Density_Array[1:end - 1]), digits = 6))")
+    println("< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
+    Density_Plot = plot(Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 2, size = [1200, 800])
+    hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Plot, "$Output_Route/Density")
-    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
-    vline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    vline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Histogram, "$Output_Route/Density_Histogram")
-    Average_Density_Plot = plot(Average_Density_Array, legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
-    hline!([mean(Density_Array)], color = :black, width = 2, linestyle = :dash)
+    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
+    hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Density_Plot, "$Output_Route/Average_Density")
 
     Summary_File = open("$Output_Route/Summary.dat", "w")
     println(Summary_File, "< E / N > = $(round(mean(Energy_Array), digits = 6)) ± $(round(std(Energy_Array), digits = 6))")
-    println(Summary_File, "< P > = $(round(mean(Pressure_Array), digits = 6)) ± $(round(std(Pressure_Array), digits = 6))")
+    #println(Summary_File, "< P > = $(round(mean(Pressure_Array), digits = 6)) ± $(round(std(Pressure_Array), digits = 6))")
     println(Summary_File, "< N > = $(round(V*mean(Density_Array), digits = 6)) ± $(round(V*std(Density_Array), digits = 6))")
     println(Summary_File, "< Density > = $(round(mean(Density_Array), digits = 6)) ± $(round(std(Density_Array), digits = 6))")
     close(Summary_File)
 
-    Povray_ini(ChemPot, T, convert(Int64, N_Measurements / 100))
+    Povray_ini(ChemPot, T, convert(Int64, floor(N_Measurements / 100)))
     Povray_Pov(L, ChemPot, T)
-    run(`povray $Output_Route/Positions/MC_Animation.ini`)
+    #run(`povray $Output_Route/Positions/MC_Animation.ini`)
+
+    return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1])
 end
 
-function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Float64, Virial::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x))
-    Energy_Old, Virial_Old = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+    Energy_Old = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     x_Old, y_Old, z_Old = x[j], y[j], z[j];
     x[j] += Displacement * (rand() - 0.5);
     x[j] = PeriodicBoundaryConditions(L, x[j]);
@@ -251,105 +262,106 @@ function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Floa
     y[j] = PeriodicBoundaryConditions(L, x[j]);
     z[j] += Displacement * (rand() - 0.5);
     z[j] = PeriodicBoundaryConditions(L, x[j]);
-    Energy_New, Virial_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z);
+    Energy_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z);
     Delta_E = Energy_New - Energy_Old;
-    Delta_Virial = Virial_New - Virial_Old
+    #Delta_Virial = Virial_New - Virial_Old
     if rand() < exp(-Beta * Delta_E)
         N_Movement_Accepted += 1;
         N_Displacement_Accepted += 1;
         Energy += Delta_E;
-        Virial += Delta_Virial;
+        #Virial += Delta_Virial;
     else
         N_Movement_Rejected += 1;
         x[j] = x_Old;
         y[j] = y_Old;
         z[j] = z_Old;
     end
-    return Energy, Virial, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted
+    return Energy, N_Movement_Accepted, N_Movement_Rejected, N_Displacement_Accepted
 end
 
-function Insertion(L::Float64, V::Float64, ChemPot::Float64, Beta::Float64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Energy::Float64, Virial::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64)
+function Insertion(L::Float64, V::Float64, ChemPot::Float64, Beta::Float64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64)
     x_Insertion = L * (rand() - 0.5)
     y_Insertion = L * (rand() - 0.5)
     z_Insertion = L * (rand() - 0.5)
-    Energy_Insertion, Virial_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
+    Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion, y_Insertion, z_Insertion, x, y, z)
     if rand() < exp( Beta * (ChemPot - Energy_Insertion) + log(V / (length(x) + 1)) )
         N_Insertion_Accepted += 1;
         append!(x, x_Insertion)
         append!(y, y_Insertion)
         append!(z, z_Insertion)
         Energy += Energy_Insertion;
-        Virial += Virial_Insertion;
+        #Virial += Virial_Insertion;
     else
         N_Insertion_Rejected += 1;
     end
-    return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
+    return Energy, N_Insertion_Accepted, N_Insertion_Rejected
 end
 
-function Insertion_Mezei(Beta::Float64, ChemPot::Float64, L::Float64, V::Float64, R_Cut::Float64, Energy::Float64, Virial::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64})
+function Insertion_Mezei(Beta::Float64, ChemPot::Float64, L::Float64, V::Float64, R_Cut::Float64, Energy::Float64, N_Insertion_Accepted::Int64, N_Insertion_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64})
     j = rand(1:length(x_Insertion))
-    Energy_Insertion, Virial_Insertion = Energy_Virial(L, R_Cut, x_Insertion[j], y_Insertion[j], z_Insertion[j], x, y, z);
+    Energy_Insertion = Energy_Virial(L, R_Cut, x_Insertion[j], y_Insertion[j], z_Insertion[j], x, y, z);
     if rand() < (V * Pc[length(x)] / (length(x) + 1) ) * exp(Beta * (ChemPot - Energy_Insertion))
         N_Insertion_Accepted += 1;
         append!(x, x_Insertion[j])
         append!(y, y_Insertion[j])
         append!(z, z_Insertion[j])
         Energy += Energy_Insertion;
-        Virial += Virial_Insertion
+        #Virial += Virial_Insertion
     else
         N_Insertion_Rejected += 1;
     end
-    return Energy, Virial, N_Insertion_Accepted, N_Insertion_Rejected
+    return Energy, N_Insertion_Accepted, N_Insertion_Rejected
 end
 
-function Removal(L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, Energy::Float64, Virial::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Removal(L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x));
-    Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+    Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     if rand() < exp( Beta * (Energy_Removal - ChemPot) + log(length(x) / V) )
         N_Removal_Accepted += 1;
         deleteat!(x, j)
         deleteat!(y, j)
         deleteat!(z, j)
         Energy -= Energy_Removal;
-        Virial -= Virial_Removal;
+        #Virial -= Virial_Removal;
     else
         N_Removal_Rejected += 1;
     end
-    return Energy, Virial, N_Removal_Accepted, N_Removal_Rejected 
+    return Energy, N_Removal_Accepted, N_Removal_Rejected 
 end
 
-function Removal_Mezei(Pc_Interpolation::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, Energy::Float64, Virial::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Removal_Mezei(Pc_Interpolation::Float64, L::Float64, V::Float64, Beta::Float64, ChemPot::Float64, R_Cut::Float64, Energy::Float64, N_Removal_Accepted::Int64, N_Removal_Rejected::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
     j = rand(1:length(x))
-    Energy_Removal, Virial_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
+    Energy_Removal = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z)
     if rand() < ( length(x) / (V * Pc_Interpolation) ) * exp(Beta * (Energy_Removal - ChemPot))
         N_Removal_Accepted += 1;
         deleteat!(x, j)
         deleteat!(y, j)
         deleteat!(z, j)
         Energy -= Energy_Removal;
-        Virial -= Virial_Removal;
+        #Virial -= Virial_Removal;
     else
         N_Removal_Rejected += 1;
     end
-    return Energy, Virial, N_Removal_Accepted, N_Removal_Rejected
+    return Energy, N_Removal_Accepted, N_Removal_Rejected
 end
 
-function u(r2::Float64)
-    if r2 <= 1
+function u_SquareWell(r2::Float64, σ::Float64, λ::Float64, e::Float64 = 1.)
+    if r2 <= (2σ)^2
         return Inf
-    elseif r2 <= 1.5^2
-        return -1
+    elseif r2 <= λ^2
+        return -e
     else
         return 0
     end
 end
 
-function rdu(r2::Float64)
-    return 4.0(6.0(1.0 / r2)^3.0 - 12.0(1.0 / r2)^6.0)
-end
+#function rdu(r2::Float64)
+#    return 4.0(6.0(1.0 / r2)^3.0 - 12.0(1.0 / r2)^6.0)
+#end
 
 function Energy_Virial(L::Float64, R_Cut::Float64, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
-    Energy, Virial = 0., 0.;
+    #Energy, Virial = 0., 0.;
+    Energy = 0.;
     @inbounds for i = 1:length(x)
         Delta_x = rx - x[i];
         Delta_x = PeriodicBoundaryConditions(L, Delta_x);
@@ -360,12 +372,12 @@ function Energy_Virial(L::Float64, R_Cut::Float64, rx::Float64, ry::Float64, rz:
         r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
         if r2 != 0.
             if r2 < R_Cut^2
-                Energy += u(r2);
-                Virial += rdu(r2);
+                Energy += u_SquareWell(r2, 0.5, 1.5);
+                #Virial += rdu(r2);
             end
         end
     end
-    return Energy, Virial
+    return Energy#, Virial
 end
 
 function PeriodicBoundaryConditions(L::Float64, x::Float64)
@@ -529,8 +541,9 @@ function Interpolation(Pc::Dict{Int64, Float64}, l::Float64)
     return Pc_Interpolation
 end
 
-function Distribution(N_Bins::Int64, L::Float64, Density::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Distribution(N_Bins::Int64, L::Float64, Density::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64)
     Delta = L / (2N_Bins);
+    Delta = R_Cut / N_Bins;
     g_r = zeros(Float64, N_Bins);
     @inbounds for i = 1:length(x) - 1
         @inbounds for j = i + 1:length(x)
@@ -541,7 +554,8 @@ function Distribution(N_Bins::Int64, L::Float64, Density::Float64, x::Array{Floa
             Delta_z = z[i] - z[j];
             Delta_z = PeriodicBoundaryConditions(L, Delta_z);
             r2 = Delta_x^2 + Delta_y^2 + Delta_z^2;
-            if r2 < (L / 2.)^2
+            #if r2 < (L / 2.)^2
+            if r2 < R_Cut^2
                 l = convert(Int64, floor(sqrt(r2) / Delta));
                 g_r[l] += 2;
             end
@@ -554,7 +568,7 @@ function Distribution(N_Bins::Int64, L::Float64, Density::Float64, x::Array{Floa
 end
 
 function Povray_Pov(L::Float64, ChemPot::Float64, T::Float64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/Positions"
+    Output_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Positions"
     Pov_File = open("$Output_Route/MC_Animation.pov", "w");
     println(Pov_File, "global_settings {\n\tambient_light rgb <0.2, 0.2, 0.2>\tmax_trace_level 15\n}\n")
     println(Pov_File, "background { color rgb <1, 1, 1> }\n")
@@ -579,7 +593,7 @@ function Povray_Pov(L::Float64, ChemPot::Float64, T::Float64)
 end
 
 function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
-    Output_Route = pwd() * "/Output_Julia/ChemPot_$(round(ChemPot, digits = 2))_T_$(round(T, digits = 2))/Positions"
+    Output_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))/Positions"
     mkpath("$Output_Route")
     Ini_File = open("$Output_Route/MC_Animation.ini", "w");
     println(Ini_File, "Input_File_Name = $Output_Route/MC_Animation.pov")
@@ -593,4 +607,28 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
     close(Ini_File)
 end
 
-@time Mezei(-3., 250., 2.)
+function Cycled_Mezei()
+    ChemPot = [9., 10., 11., 12.];
+    T = 4.0;
+    L = 10.
+    Mean_Density = zeros(Float64, length(ChemPot));
+    Std_Density = zeros(Float64, length(ChemPot));
+    j = 1;
+
+    Output_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))"
+    mkpath("$Output_Route")
+    Density_File = open("$Output_Route/Density_T_$T.dat", "a+");
+    #println(Density_File, "ChemPot\tDensity\tErrorDensity")
+    for μ in ChemPot
+        Mean_Density[j], Std_Density[j] = Mezei(μ, L, T);
+        println(Density_File, "$μ $(Mean_Density[j]) $(Std_Density[j])")
+        j += 1;
+    end
+    
+    Density = CSV.read("$Output_Route/Density_T_$T.dat", delim = "\t")
+    Average_Density_Plot = plot(Density.ChemPot, Density.Density, yerror = Density.ErrorDensity, background_color_legend = false, foreground_color_legend = false, legend = :topleft, label = "T = $T", xlabel = "Chemical Potential", ylabel= "< Density > [Unitless]", width = 3, ylims = (0, findmax(Mean_Density)[1] + 0.05 ), size = [1200, 800])
+    savefig(Average_Density_Plot, "$Output_Route/Density_T_$T")
+    close(Density_File)
+end
+
+@time Cycled_Mezei()

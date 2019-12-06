@@ -1,7 +1,8 @@
 #Output Files
 *.dat
 Output
-Output_Julia
+Output_Julia_OLD
+*.xyz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
