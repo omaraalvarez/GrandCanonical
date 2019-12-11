@@ -55,6 +55,7 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
             #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
+            println("Max Displacement = $Displacement")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted")
             println("   Rejected: $N_Movement_Rejected")
@@ -76,6 +77,7 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
             #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
+            println("Max Displacement = $Displacement")
             println("Movements: $N_Movement")
             println("   Accepted: $N_Movement_Accepted")
             println("   Rejected: $N_Movement_Rejected")
@@ -155,7 +157,7 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
             end
             if i % 10MC_Measurement == 0
                 N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
-                Displacement < 0.05 ? Displacement = 0.05 : nothing
+                #Displacement < 0.05 ? Displacement = 0.05 : nothing
                 Displacement > L / 4. ? Displacement = L / 4. : nothing
                 N_Displacement, N_Displacement_Accepted = 0, 0;
             end
@@ -259,9 +261,9 @@ function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Floa
     x[j] += Displacement * (rand() - 0.5);
     x[j] = PeriodicBoundaryConditions(L, x[j]);
     y[j] += Displacement * (rand() - 0.5);
-    y[j] = PeriodicBoundaryConditions(L, x[j]);
+    y[j] = PeriodicBoundaryConditions(L, y[j]);
     z[j] += Displacement * (rand() - 0.5);
-    z[j] = PeriodicBoundaryConditions(L, x[j]);
+    z[j] = PeriodicBoundaryConditions(L, z[j]);
     Energy_New = Energy_Virial(L, R_Cut, x[j], y[j], z[j], x, y, z);
     Delta_E = Energy_New - Energy_Old;
     #Delta_Virial = Virial_New - Virial_Old
@@ -608,7 +610,7 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
 end
 
 function Cycled_Mezei()
-    ChemPot = [9., 10., 11., 12.];
+    ChemPot = [3.7];
     T = 4.0;
     L = 10.
     Mean_Density = zeros(Float64, length(ChemPot));
