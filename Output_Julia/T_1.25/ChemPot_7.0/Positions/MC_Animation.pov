@@ -121,7 +121,7 @@ triangle {
 #end
 #declare L = 10.0;
 #declare h = 10.0;
-#fopen File_Positions concat("/home/omaralvarez/git/Mezei/Output_Julia/T_1.25/ChemPot_7.0/Positions/Pos_", str(clock, 1, 0), ".xyz") read
+#fopen File_Positions concat("/home/omaralvarez/git/muVT_Mezei/Output_Julia/T_1.25/ChemPot_7.0/Positions/Pos_", str(clock, 1, 0), ".xyz") read
 	#while (defined( File_Positions ))
 		#read (File_Positions, rx, ry, rz)
 		Particle(rx, ry, -rz)

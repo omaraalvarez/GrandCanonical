@@ -1,7 +1,7 @@
 #Output Files
 *.dat
-Output
-Output_Julia_OLD
+#Output
+Output_Julia_Older
 *.xyz
 
 # Byte-compiled / optimized / DLL files

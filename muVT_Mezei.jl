@@ -2,10 +2,10 @@ using Statistics;
 using Plots;
 using CSV;
 
-function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
+function Mezei(ChemPot::Float64, L::Float64, T::Float64, Number_Run::Int64, Total_Run::Int64, R_Cut::Float64 = 3.)
     """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 2_500_000;
-    MC_Equilibrium_Steps = 10_000_000;
+    MC_Relaxation_Steps = 1_000_000;
+    MC_Equilibrium_Steps = 5_000_000;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
     """     VARIABLE INITIALIZATION     """
     Overlap = 1.0;
@@ -25,6 +25,7 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     Energy_Sum, Density_Sum = 0., 0.;
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    Error_Energy_Array, Error_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     #Energy, Virial, N_Measurements = 0., 0., 0;
     #Energy_Sum, Pressure_Sum, Density_Sum = 0., 0., 0.;
     #Energy_Array, Pressure_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
@@ -50,21 +51,21 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     @inbounds for i = 1:MC_Steps
         """     PRINTS PROGRESS TO SCREEN   """
         if i < MC_Relaxation_Steps && i % .01MC_Relaxation_Steps == 0
-            println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation")
+            println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation [$Number_Run / $Total_Run]")
             println("U / N = $(round(Energy / length(x), digits = 6))")
             #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
-            println("Max Displacement = $Displacement")
+            println("Max Displacement = $(round(Displacement, digits = 6))")
             println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted ($(100N_Movement_Accepted / N_Movement)%)")
-            println("   Rejected: $N_Movement_Rejected ($(100N_Movement_Rejected / N_Movement)%)")
+            println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%")
+            println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
             println("Insertions: $N_Insertion")
-            println("   Accepted: $N_Insertion_Accepted ($(100N_Insertion_Accepted / N_Insertion)%)")
-            println("   Rejected: $N_Insertion_Rejected ($(100N_Insertion_Rejected / N_Insertion)%)")
+            println("   Accepted: $N_Insertion_Accepted ($(round(100N_Insertion_Accepted / N_Insertion, digits = 2))%)")
+            println("   Rejected: $N_Insertion_Rejected ($(round(100N_Insertion_Rejected / N_Insertion, digits = 2))%)")
             println("Removal: $N_Removal")
-            println("   Accepted: $N_Removal_Accepted ($(100N_Removal_Accepted / N_Removal)%)")
-            println("   Rejected: $N_Removal_Rejected ($(100N_Removal_Rejected / N_Removal)%)")
+            println("   Accepted: $N_Removal_Accepted ($(round(100N_Removal_Accepted / N_Removal, digits = 2))%)")
+            println("   Rejected: $N_Removal_Rejected ($(round(100N_Removal_Rejected / N_Removal, digits = 2))%)")
             println("")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
             N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
@@ -72,21 +73,21 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
         end
 
         if i > MC_Relaxation_Steps && i % .01MC_Equilibrium_Steps == 0
-            println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements).")
+            println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements). [$Number_Run / $Total_Run]")
             println("U / N = $(round(Energy / length(x), digits = 6))")
             #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
             println("N = $(length(x))")
             println("Density = $(round(length(x) / V, digits = 6))")
-            println("Max Displacement = $Displacement")
+            println("Max Displacement = $(round(Displacement, digits = 6))")
             println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted ($(100N_Movement_Accepted / N_Movement)%)")
-            println("   Rejected: $N_Movement_Rejected ($(100N_Movement_Rejected / N_Movement)%)")
+            println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%")
+            println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
             println("Insertions: $N_Insertion")
-            println("   Accepted: $N_Insertion_Accepted ($(100N_Insertion_Accepted / N_Insertion)%)")
-            println("   Rejected: $N_Insertion_Rejected ($(100N_Insertion_Rejected / N_Insertion)%)")
+            println("   Accepted: $N_Insertion_Accepted ($(round(100N_Insertion_Accepted / N_Insertion, digits = 2))%)")
+            println("   Rejected: $N_Insertion_Rejected ($(round(100N_Insertion_Rejected / N_Insertion, digits = 2))%)")
             println("Removal: $N_Removal")
-            println("   Accepted: $N_Removal_Accepted ($(100N_Removal_Accepted / N_Removal)%)")
-            println("   Rejected: $N_Removal_Rejected ($(100N_Removal_Rejected / N_Removal)%)")
+            println("   Accepted: $N_Removal_Accepted ($(round(100N_Removal_Accepted / N_Removal, digits = 2))%)")
+            println("   Rejected: $N_Removal_Rejected ($(round(100N_Removal_Rejected / N_Removal, digits = 2))%)")
             println("")
             N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
             N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
@@ -136,7 +137,8 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
                 println(Energy_File, "$N_Measurements\t$(round(Energy_Array[N_Measurements], digits = 6))")
                 Energy_Sum += Energy / length(x);
                 Average_Energy_Array[N_Measurements] = Energy_Sum / N_Measurements;
-                println(Average_Energy_File, "$N_Measurements\t$(round(Average_Energy_Array[N_Measurements], digits = 6))")
+                Error_Energy_Array[N_Measurements] = std(Energy_Array[1 : N_Measurements])
+                println(Average_Energy_File, "$N_Measurements\t$(round(Average_Energy_Array[N_Measurements], digits = 6))\t$(round(Error_Energy_Array[N_Measurements], digits = 6))")
                 #Pressure_Array[N_Measurements] = (length(x) * T - Virial / 3.) / V
                 #println(Pressure_File, "$N_Measurements\t$(round(Pressure_Array[N_Measurements], digits = 6))")
                 #Pressure_Sum += (length(x) * T - Virial / 3.) / V;
@@ -146,7 +148,8 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
                 println(Density_File, "$N_Measurements\t$(round(Density_Array[N_Measurements], digits = 6))")
                 Density_Sum += length(x) / V;
                 Average_Density_Array[N_Measurements] = Density_Sum / N_Measurements;
-                println(Average_Density_File, "$N_Measurements\t$(round(Average_Density_Array[N_Measurements], digits = 6))")
+                Error_Density_Array[N_Measurements] = std(Density_Array[1 : N_Measurements])
+                println(Average_Density_File, "$N_Measurements\t$(round(Average_Density_Array[N_Measurements], digits = 6))\t$(round(Error_Density_Array[N_Measurements], digits = 6))")
                 g_r += Distribution(N_Bins, L, length(x) / V, x, y, z, R_Cut)
                 if N_Measurements % 100 == 0
                     Positions_File = open("$Output_Route/Positions/Pos_$(convert(Int64, N_Measurements / 100)).xyz", "w");
@@ -155,18 +158,17 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
                     end
                 end
             end
-            if i % 10MC_Measurement == 0
-                N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
-                #Displacement < 0.05 ? Displacement = 0.05 : nothing
-                Displacement > L / 4. ? Displacement = L / 4. : nothing
-                N_Displacement, N_Displacement_Accepted = 0, 0;
-            end
+            N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
+            Displacement < 0.05 ? Displacement = 0.05 : nothing
+            Displacement > L / 4. ? Displacement = L / 4. : nothing
+            N_Displacement, N_Displacement_Accepted = 0, 0;
         end
     end
     close(Average_Energy_File)
     #close(Average_Pressure_File)
     close(Average_Density_File)
-    
+    Error_Density_Array[1], Error_Energy_Array[1] = 0., 0.;
+
     g_r /= N_Measurements;
     #Delta = L / (2N_Bins);
     Delta = R_Cut / N_Bins;
@@ -179,8 +181,8 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     end
     g_r = g_r[1 : N_Bins - 1]
     close(g_r_File)
-    Radial_Distribution_Plot = plot(r, g_r, legend = false, xlabel = "Distance [r]", ylabel = "Normalized Density", width = 3, size = [1200, 800])
-    hline!([1.0], color = :black, width = 2, linestyle = :dash)
+    Radial_Distribution_Plot = plot(r, g_r, title = "Chemical Potential = $ChemPot", legend = false, xlabel = "Distance [r]", ylabel = "Normalized Density", width = 3, size = [1200, 800])
+    hline!([1.], style = :dash, width = 3, color = :black)
     savefig(Radial_Distribution_Plot, "$Output_Route/RadialDistribution")
 
 
@@ -208,12 +210,12 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
 
     println("< E / N > = $(round(mean(Energy_Array[1:end - 1]), digits = 6)) ± $(round(std(Energy_Array[1:end - 1]), digits = 6))")
     Energy_Plot = plot(Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Energy [Unitless]", width = 2, size = [1200, 800])
-    hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
+    hline!([mean(Energy_Array[1:end - 1])], title = "Chemical Potential = $ChemPot", color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Plot, "$Output_Route/Energy")
-    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    Energy_Histogram = histogram(Energy_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], title = "Chemical Potential = $ChemPot", bins = 20, legend = false, xlabel = "Energy [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Energy_Histogram, "$Output_Route/Energy_Histogram")
-    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
+    Average_Energy_Plot = plot(Average_Energy_Array[1:end - 1], ribbon = Error_Energy_Array, fillalpha = 0.2, xlims = (1, N_Measurements), title = "Chemical Potential = $ChemPot", legend = false, xlabel = "Measurements", ylabel = "< Energy > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Energy_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Energy_Plot, "$Output_Route/Average_Energy")
 
@@ -231,12 +233,12 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     println("< N > = $(round(V*mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(V*std(Density_Array[1:end - 1]), digits = 6))")
     println("< Density > = $(round(mean(Density_Array[1:end - 1]), digits = 6)) ± $(round(std(Density_Array[1:end - 1]), digits = 6))")
     Density_Plot = plot(Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel = "Density [Unitless]", width = 2, size = [1200, 800])
-    hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
+    hline!([mean(Density_Array[1:end - 1])], title = "Chemical Potential = $ChemPot", color = :black, width = 2, linestyle = :dash)
     savefig(Density_Plot, "$Output_Route/Density")
-    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
+    Density_Histogram = histogram(Density_Array[convert(Int64, floor(MC_Relaxation_Steps/MC_Measurement)):end - 1], title = "Chemical Potential = $ChemPot", bins = 20, legend = false, xlabel = "Density [Unitless]", ylabel = "Frequency", size = [1200, 800])
     vline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Density_Histogram, "$Output_Route/Density_Histogram")
-    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
+    Average_Density_Plot = plot(Average_Density_Array[1:end - 1], ribbon = Error_Density_Array, fillalpha = 0.2, xlims = (1, N_Measurements), title = "Chemical Potential = $ChemPot", legend = false, xlabel = "Measurements", ylabel= "< Density > [Unitless]", width = 3, size = [1200, 800])
     hline!([mean(Density_Array[1:end - 1])], color = :black, width = 2, linestyle = :dash)
     savefig(Average_Density_Plot, "$Output_Route/Average_Density")
 
@@ -251,7 +253,7 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, R_Cut::Float64 = 3.)
     Povray_Pov(L, ChemPot, T)
     #run(`povray $Output_Route/Positions/MC_Animation.ini`)
 
-    return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1])
+    return mean(Density_Array[1:end - 1]), std(Density_Array[1:end - 1]), Energy_Plot, Energy_Histogram, Average_Energy_Plot, Density_Plot, Density_Histogram, Average_Density_Plot, Radial_Distribution_Plot
 end
 
 function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Float64, N_Movement_Accepted::Int64, N_Movement_Rejected::Int64, N_Displacement_Accepted::Int64, R_Cut::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
@@ -610,8 +612,8 @@ function Povray_ini(ChemPot::Float64, T::Float64, Frames::Int64)
 end
 
 function Cycled_Mezei()
-    ChemPot = [3.7];
-    T = 4.0;
+    ChemPot = [-3., -2., -1.0, 0., 1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12.];
+    T = 3.;
     L = 10.
     Mean_Density = zeros(Float64, length(ChemPot));
     Std_Density = zeros(Float64, length(ChemPot));
@@ -619,16 +621,60 @@ function Cycled_Mezei()
 
     Output_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))"
     mkpath("$Output_Route")
-    Density_File = open("$Output_Route/Density_T_$T.dat", "a+");
-    #println(Density_File, "ChemPot\tDensity\tErrorDensity")
+    Density_File = open("$Output_Route/Density_T_$T.dat", "w+");
+    println(Density_File, "ChemPot\tDensity\tErrorDensity")
+    p_Radial = Array{Any, 1}(undef, length(ChemPot))
+    p_Energy = Array{Any, 1}(undef, length(ChemPot))
+    p_Histogram_Energy = Array{Any, 1}(undef, length(ChemPot))
+    p_Average_Energy = Array{Any, 1}(undef, length(ChemPot))
+    p_Density = Array{Any, 1}(undef, length(ChemPot))
+    p_Histogram_Density = Array{Any, 1}(undef, length(ChemPot))
+    p_Average_Density = Array{Any, 1}(undef, length(ChemPot))
+
     for μ in ChemPot
-        Mean_Density[j], Std_Density[j] = Mezei(μ, L, T);
-        println(Density_File, "$μ $(Mean_Density[j]) $(Std_Density[j])")
+        Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_Radial[j] = Mezei(μ, L, T, j, length(ChemPot));
+        println(Density_File, "$μ\t$(Mean_Density[j])\t$(Std_Density[j])")
+        #Chem_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))/ChemPot_$(round(μ, digits = 2))"
+        #Radial = CSV.read("$Chem_Route/Radial_Distribution.dat", delim = "\t", header = false)
+        #p_Radial[j] = plot((Radial.Column1, Radial.Column2), title = "Chemical Potential = $μ", grid = false, xlabel = "Distance [r]", ylabel= "g(r) [Unitless]", width = 3, legend = false)
+        #hline!([1.], style = :dash, width = 3, color = :black)
+
+        #Energies = CSV.read("$Chem_Route/Radial_Distribution.dat", delim = "\t", header = false)
         j += 1;
     end
+
+    y = ones(3)
+    title = Plots.scatter(y, marker = 0, markeralpha = 0, annotations=(2, y[2], Plots.text("T = $T", :black, 25)), axis=false, grid = false, leg=false,size=(1920,50))
     
-    Density = CSV.read("$Output_Route/Density_T_$T.dat", delim = "\t")
-    Average_Density_Plot = plot(Density.ChemPot, Density.Density, yerror = Density.ErrorDensity, background_color_legend = false, foreground_color_legend = false, legend = :topleft, label = "T = $T", xlabel = "Chemical Potential", ylabel= "< Density > [Unitless]", width = 3, ylims = (0, findmax(Mean_Density)[1] + 0.05 ), size = [1200, 800])
+    Radial_Plot = plot(p_Radial[1], p_Radial[2], p_Radial[3], p_Radial[4], p_Radial[5], p_Radial[6], p_Radial[7], p_Radial[8], p_Radial[9], p_Radial[10], p_Radial[11], p_Radial[12], p_Radial[13], p_Radial[14], p_Radial[15], p_Radial[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Radial_Plot = plot(title, Radial_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Radial_Plot, "$Output_Route/Radial_Distribution_$T")
+
+    Energy_Plot = plot(p_Energy[1], p_Energy[2], p_Energy[3], p_Energy[4], p_Energy[5], p_Energy[6], p_Energy[7], p_Energy[8], p_Energy[9], p_Energy[10], p_Energy[11], p_Energy[12], p_Energy[13], p_Energy[14], p_Energy[15], p_Energy[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Energy_Plot = plot(title, Energy_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Energy_Plot, "$Output_Route/Energy_$T")
+
+    Energy_Histogram_Plot = plot(p_Histogram_Energy[1], p_Histogram_Energy[2], p_Histogram_Energy[3], p_Histogram_Energy[4], p_Histogram_Energy[5], p_Histogram_Energy[6], p_Histogram_Energy[7], p_Histogram_Energy[8], p_Histogram_Energy[9], p_Histogram_Energy[10], p_Histogram_Energy[11], p_Histogram_Energy[12], p_Histogram_Energy[13], p_Histogram_Energy[14], p_Histogram_Energy[15], p_Histogram_Energy[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Energy_Histogram_Plot = plot(title, Energy_Histogram_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Energy_Histogram_Plot, "$Output_Route/Energy_Histogram_$T")
+
+    Energy_Average_Plot = plot(p_Average_Energy[1], p_Average_Energy[2], p_Average_Energy[3], p_Average_Energy[4], p_Average_Energy[5], p_Average_Energy[6], p_Average_Energy[7], p_Average_Energy[8], p_Average_Energy[9], p_Average_Energy[10], p_Average_Energy[11], p_Average_Energy[12], p_Average_Energy[13], p_Average_Energy[14], p_Average_Energy[15], p_Average_Energy[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Average_Energy_Plot = plot(title, Energy_Average_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Average_Energy_Plot, "$Output_Route/Average_Energy_$T")
+
+    Density_Plot = plot(p_Density[1], p_Density[2], p_Density[3], p_Density[4], p_Density[5], p_Density[6], p_Density[7], p_Density[8], p_Density[9], p_Density[10], p_Density[11], p_Density[12], p_Density[13], p_Density[14], p_Density[15], p_Density[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Density_Plot = plot(title, Density_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Density_Plot, "$Output_Route/Density_$T")
+
+    Density_Histogram_Plot = plot(p_Histogram_Density[1], p_Histogram_Density[2], p_Histogram_Density[3], p_Histogram_Density[4], p_Histogram_Density[5], p_Histogram_Density[6], p_Histogram_Density[7], p_Histogram_Density[8], p_Histogram_Density[9], p_Histogram_Density[10], p_Histogram_Density[11], p_Histogram_Density[12], p_Histogram_Density[13], p_Histogram_Density[14], p_Histogram_Density[15], p_Histogram_Density[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Density_Histogram_Plot = plot(title, Density_Histogram_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Density_Histogram_Plot, "$Output_Route/Density_Histogram_$T")
+
+    Density_Average_Plot = plot(p_Average_Density[1], p_Average_Density[2], p_Average_Density[3], p_Average_Density[4], p_Average_Density[5], p_Average_Density[6], p_Average_Density[7], p_Average_Density[8], p_Average_Density[9], p_Average_Density[10], p_Average_Density[11], p_Average_Density[12], p_Average_Density[13], p_Average_Density[14], p_Average_Density[15], p_Average_Density[16], layout = (4, 4), size = [1920, 1080])
+    Complete_Average_Density_Plot = plot(title, Density_Average_Plot, layout = grid(2, 1, heights = [0.025, 0.975]))
+    savefig(Complete_Average_Density_Plot, "$Output_Route/Average_Density_$T")
+
+    Average_Density_Plot = plot(ChemPot, Mean_Density, yerror = Std_Density, background_color_legend = false, foreground_color_legend = false, legend = :topleft, label = "T = $T", xlabel = "Chemical Potential", ylabel= "< Density > [Unitless]", width = 3, ylims = (0, findmax(Mean_Density)[1] + 0.05 ), size = [1200, 800])
     savefig(Average_Density_Plot, "$Output_Route/Density_T_$T")
     close(Density_File)
 end
