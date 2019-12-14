@@ -634,12 +634,6 @@ function Cycled_Mezei()
     for μ in ChemPot
         Mean_Density[j], Std_Density[j], p_Energy[j], p_Histogram_Energy[j], p_Average_Energy[j], p_Density[j], p_Histogram_Density[j], p_Average_Density[j], p_Radial[j] = Mezei(μ, L, T, j, length(ChemPot));
         println(Density_File, "$μ\t$(Mean_Density[j])\t$(Std_Density[j])")
-        #Chem_Route = pwd() * "/Output_Julia/T_$(round(T, digits = 2))/ChemPot_$(round(μ, digits = 2))"
-        #Radial = CSV.read("$Chem_Route/Radial_Distribution.dat", delim = "\t", header = false)
-        #p_Radial[j] = plot((Radial.Column1, Radial.Column2), title = "Chemical Potential = $μ", grid = false, xlabel = "Distance [r]", ylabel= "g(r) [Unitless]", width = 3, legend = false)
-        #hline!([1.], style = :dash, width = 3, color = :black)
-
-        #Energies = CSV.read("$Chem_Route/Radial_Distribution.dat", delim = "\t", header = false)
         j += 1;
     end
 
