@@ -1,66 +1,52 @@
 using Statistics;
-using Plots;
+using Plots; gr()
+using Plots.PlotMeasures;
+using Test;
+using LaTeXStrings;
+using StatsPlots;
+using Distributions;
 using CSV;
 
-function Mezei(ChemPot::Float64, L::Float64, T::Float64, Number_Run::Int64, Total_Run::Int64, R_Cut::Float64 = 3.)
-    """     CONFIGURATIONAL STEPS       """
-    MC_Relaxation_Steps = 1_000_000;
-    MC_Equilibrium_Steps = 5_000_000;
+function GrandCanonical_MonteCarlo(μ::Float64, T::Float64, R_Cut::Float64 = 3.0)
+    ##################################### CONFIGURATIONAL STEPS #############################
+    println("************ GRAND CANONICAL MONTE CARLO *************")
+    MC_Relaxation_Steps = 20_000;
+    MC_Equilibrium_Steps = 250_000;
+    MC_Measurement = 10;
     MC_Steps = MC_Equilibrium_Steps + MC_Relaxation_Steps;
-    """     VARIABLE INITIALIZATION     """
-    Overlap = 1.0;
-    σ_p, λ_p = 0.5, 1.5;
-    x, y, z = Float64[], Float64[], Float64[];
-    V = L ^ 3.;
-    MC_Measurement = convert(Int64, floor(V / (10 * (4. / 3.) * π * σ_p^3 )));
-    Beta = 1. / T
+    ##################################### VARIABLE INITIALIZATION ###########################
+    L, σ, λ = 20., 1.0, 1.5;
+    V, Beta, N_Bins = L ^ 3., 1. / T, 150;
+    N_Id = convert(Int64, round(0.5 * V));
     Pc, Pc_Sum, Pc_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     #Pc_Grid, Pc_Grid_Sum, Pc_Grid_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
-    #Pc_Analytic, Pc_Analytic_Sum, Pc_Analytic_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     Displacement, N_Displacement, N_Displacement_Accepted = L / 8., 0, 0;
     N_Movement, N_Movement_Accepted, N_Movement_Rejected = 0, 0, 0;
     N_Insertion, N_Insertion_Accepted, N_Insertion_Rejected = 0, 0, 0;
     N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
-    Energy, N_Measurements = 0., 0;
-    Energy_Sum, Density_Sum = 0., 0.;
+    Energy, Density, N_Measurements = 0., 0., 0;
     Energy_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    Average_Energy_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    Error_Energy_Array, Error_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    #Energy, Virial, N_Measurements = 0., 0., 0;
-    #Energy_Sum, Pressure_Sum, Density_Sum = 0., 0., 0.;
-    #Energy_Array, Pressure_Array, Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    #Average_Energy_Array, Average_Pressure_Array, Average_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
-    N_Bins = 150;
-    N_Image = 1;
+    Mean_Energy_Array, Mean_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
+    STD_Energy_Array, STD_Density_Array = zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) ), zeros(Float64, convert(Int64, ceil(MC_Equilibrium_Steps / MC_Measurement) ) );
     g_r = zeros(Float64, N_Bins);
-    """     OUTPUT FILES        """
+    ####################################### OUTPUT ROUTE, INITIAL POSITIONS AND INITIAL ENERGY ###########################
     Output_Route = pwd() * "/Output/T_$(round(T, digits = 2))/ChemPot_$(round(ChemPot, digits = 2))"
     mkpath("$Output_Route/Positions")
-    Average_Energy_File = open("$Output_Route/Average_Energy.dat", "w");
-    println(Average_Energy_File, "#\t< E / N >")
-    Energy_File = open("$Output_Route/Energy.dat", "w");
-    println(Energy_File, "#\tE / N ")
-    #Average_Pressure_File = open("$Output_Route/Average_Pressure.dat", "w");
-    #println(Average_Pressure_File, "#\t< P >")
-    #Pressure_File = open("$Output_Route/Pressure.dat", "w");
-    #println(Pressure_File, "#\tP")
-    Average_Density_File = open("$Output_Route/Average_Density.dat", "w");
-    println(Average_Density_File, "#\t< Density >")
-    Density_File = open("$Output_Route/Density.dat", "w");
-    println(Density_File, "#\tDensity")
-    """     SIMULATIONS CYCLES      """
-    @inbounds for i = 1:MC_Steps
+    x, y, z = Float64[], Float64[], Float64[];
+    ################################################# SIMULATION CYCLES ###########################################
+    @inbounds for k = 1:MC_Steps
+        @test all(Array(x) .<= L / 2.) && all(Array(x) .>= -L / 2.)
+        @test all(Array(y) .<= L / 2.) && all(Array(y) .>= -L / 2.)
+        @test all(Array(z) .<= L / 2.) && all(Array(z) .>= -L / 2.)
         """     PRINTS PROGRESS TO SCREEN   """
-        if i < MC_Relaxation_Steps && i % .01MC_Relaxation_Steps == 0
-            println("$(convert(Int64, 100i / MC_Relaxation_Steps))% Relaxation [$Number_Run / $Total_Run]")
+        if k < MC_Relaxation_Steps && k % .01MC_Relaxation_Steps == 0
+            println("$(convert(Int64, 100k / MC_Relaxation_Steps))% Relaxation.")
+            println("N = $N Particles")
             println("U / N = $(round(Energy / length(x), digits = 6))")
-            #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
-            println("N = $(length(x))")
-            println("Density = $(round(length(x) / V, digits = 6))")
             println("Max Displacement = $(round(Displacement, digits = 6))")
-            println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%")
-            println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
+            println("Movements: $N_Displacement")
+            println("   Accepted: $N_Displacement_Accepted ($(round(100N_Displacement_Accepted/N_Displacement, digits = 2))%)")
+            println("   Rejected: $(N_Displacement - N_Displacement_Accepted) ($(round(100 - 100N_Displacement_Accepted/N_Displacement, digits = 2))%)")
             println("Insertions: $N_Insertion")
             println("   Accepted: $N_Insertion_Accepted ($(round(100N_Insertion_Accepted / N_Insertion, digits = 2))%)")
             println("   Rejected: $N_Insertion_Rejected ($(round(100N_Insertion_Rejected / N_Insertion, digits = 2))%)")
@@ -73,16 +59,15 @@ function Mezei(ChemPot::Float64, L::Float64, T::Float64, Number_Run::Int64, Tota
             N_Removal, N_Removal_Accepted, N_Removal_Rejected = 0, 0, 0;
         end
 
-        if i > MC_Relaxation_Steps && i % .01MC_Equilibrium_Steps == 0
-            println("$(convert(Int64, 100(i - MC_Relaxation_Steps) / MC_Equilibrium_Steps))% Equilibrium ($N_Measurements Measurements). [$Number_Run / $Total_Run]")
+        if k > MC_Relaxation_Steps && k % .01MC_Equilibrium_Steps == 0
+            println("$(convert(Int64, ceil(100(k - MC_Relaxation_Steps) / MC_Equilibrium_Steps)))% Equilibrium [$(N_Measurements + 1) Measurements]")
+            println("N = $N Particles")
             println("U / N = $(round(Energy / length(x), digits = 6))")
-            #println("P = $(round((length(x) * T - Virial / 3.) / V, digits = 6))")
-            println("N = $(length(x))")
-            println("Density = $(round(length(x) / V, digits = 6))")
+            println("μ = $(round(μ_Array[N_Measurements], digits = 6))")
             println("Max Displacement = $(round(Displacement, digits = 6))")
-            println("Movements: $N_Movement")
-            println("   Accepted: $N_Movement_Accepted ($(round(100N_Movement_Accepted / N_Movement, digits = 2))%")
-            println("   Rejected: $N_Movement_Rejected ($(round(100N_Movement_Rejected / N_Movement, digits = 2))%)")
+            println("Movements: $N_Displacement")
+            println("   Accepted: $N_Displacement_Accepted ($(round(100N_Displacement_Accepted/N_Displacement, digits = 2))%)")
+            println("   Rejected: $(N_Displacement - N_Displacement_Accepted) ($(round(100 - 100N_Displacement_Accepted/N_Displacement, digits = 2))%)")
             println("Insertions: $N_Insertion")
             println("   Accepted: $N_Insertion_Accepted ($(round(100N_Insertion_Accepted / N_Insertion, digits = 2))%)")
             println("   Rejected: $N_Insertion_Rejected ($(round(100N_Insertion_Rejected / N_Insertion, digits = 2))%)")

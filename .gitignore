@@ -1,13 +1,17 @@
+Plotting.jl
+Python_Mezei.py
 #Output Files
 *.dat
+Output
+
 #Output
-Output_Julia_Older
 *.xyz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+*.py
 
 # C extensions
 *.so
