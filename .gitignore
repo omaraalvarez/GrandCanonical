@@ -1,10 +1,6 @@
-Plotting.jl
-Python_Mezei.py
 #Output Files
 *.dat
 Output
-
-#Output
 *.xyz
 
 # Byte-compiled / optimized / DLL files

@@ -6,7 +6,7 @@ using LaTeXStrings;
 using StatsPlots;
 using Distributions;
 
-function GrandCanonical_MonteCarlo(μ::Float64, T::Float64, R_Cut::Float64 = 3.0)
+function GrandCanonical_MonteCarlo(μ::Type, T::Type, R_Cut::Type = 3.) where {Type <: Real}
     ##################################### CONFIGURATIONAL STEPS #############################
     println("\t\tGRAND CANONICAL MONTE CARLO")
     MC_Relaxation_Steps = 20_000;
@@ -16,7 +16,7 @@ function GrandCanonical_MonteCarlo(μ::Float64, T::Float64, R_Cut::Float64 = 3.0
     ##################################### VARIABLE INITIALIZATION ###########################
     L, σ, λ = 20., 1.0, 1.5;
     V, Beta, N_Bins, Equilibrium = L ^ 3., 1. / T, 150, false;
-    N_Id = convert(Int64, round(0.1 * V));
+    N_Id = convert(Int64, round(0.5 * V));
     Pc, Pc_Sum, Pc_N = Dict{Int64, Float64}(), Dict{Int64, Float64}(), Dict{Int64, Int64}();
     Displacement, N_Displacement, N_Displacement_Accepted = L / 8., 0, 0;
     N_Insertion, N_Insertion_Accepted = 0, 0;
@@ -210,7 +210,7 @@ function GrandCanonical_MonteCarlo(μ::Float64, T::Float64, R_Cut::Float64 = 3.0
     savefig(Density_Plots, "$Output_Route/Density_Plots")
 end
 
-function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Float64, N_Displacement_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64 = 3.0)
+function Movement(L::Type, Beta::Type, Displacement::Float64, Energy::Float64, N_Displacement_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Type = 3.) where {Type <: Real}
     i = rand(1:length(x));
     Energy_Old = Energy_Calculation(L, x[i], y[i], z[i], x, y, z);
     x_Old, y_Old, z_Old = x[i], y[i], z[i];
@@ -231,7 +231,7 @@ function Movement(L::Float64, Beta::Float64, Displacement::Float64, Energy::Floa
     return Energy, N_Displacement_Accepted
 end
 
-function Insertion(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_Insertion_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64 = 3.0)
+function Insertion(L::Type, μ::Type, Beta::Type, Energy::Float64, N_Insertion_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Type = 3.) where {Type <: Real}
     x_Insertion, y_Insertion, z_Insertion = L * (rand() - 0.5), L * (rand() - 0.5), L * (rand() - 0.5);
     Energy_Insertion = Energy_Calculation(L, x_Insertion, y_Insertion, z_Insertion, x, y, z);
     if rand() < exp( Beta * (μ - Energy_Insertion) + log(L^3. / (length(x) + 1)) )
@@ -244,7 +244,7 @@ function Insertion(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_In
     return Energy, N_Insertion_Accepted
 end
 
-function Insertion_Mezei(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_Insertion_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64}, R_Cut::Float64 = 3.)
+function Insertion_Mezei(L::Type, μ::Type, Beta::Type, Energy::Float64, N_Insertion_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, x_Insertion::Array{Float64, 1}, y_Insertion::Array{Float64, 1}, z_Insertion::Array{Float64, 1}, Pc::Dict{Int64, Float64}, R_Cut::Type = 3.) where {Type <: Real}
     i = rand(1:length(x_Insertion))
     Energy_Insertion = Energy_Calculation(L, x_Insertion[i], y_Insertion[i], z_Insertion[i], x, y, z);
     if rand() < (L^3. * Pc[length(x)] / (length(x) + 1) ) * exp(Beta * (μ - Energy_Insertion))
@@ -257,7 +257,7 @@ function Insertion_Mezei(L::Float64, μ::Float64, Beta::Float64, Energy::Float64
     return Energy, N_Insertion_Accepted
 end
 
-function Removal(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_Removal_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64 = 3.0)
+function Removal(L::Type, μ::Type, Beta::Type, Energy::Float64, N_Removal_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Type = 3.) where {Type <: Real}
     i = rand(1:length(x));
     Energy_Removal = Energy_Calculation(L, x[i], y[i], z[i], x, y, z);
     if rand() < exp( Beta * (Energy_Removal - μ) + log(length(x) / L^3.) )
@@ -270,7 +270,7 @@ function Removal(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_Remo
     return Energy, N_Removal_Accepted
 end
 
-function Removal_Mezei(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, N_Removal_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Pc_Interpolation::Float64, R_Cut::Float64 = 3.0)
+function Removal_Mezei(L::Type, μ::Type, Beta::Type, Energy::Float64, N_Removal_Accepted::Int64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, Pc_Interpolation::Float64, R_Cut::Type = 3.) where {Type <: Real}
     i = rand(1:length(x))
     Energy_Removal = Energy_Calculation(L, x[i], y[i], z[i], x, y, z);
     if rand() < ( length(x) / (L^3. * Pc_Interpolation) ) * exp(Beta * (Energy_Removal - μ))
@@ -283,7 +283,7 @@ function Removal_Mezei(L::Float64, μ::Float64, Beta::Float64, Energy::Float64, 
     return Energy, N_Removal_Accepted
 end
 
-function Energy_Calculation(L::Float64, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64 = 3.0)
+function Energy_Calculation(L::Type, rx::Float64, ry::Float64, rz::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Type = 3.) where {Type <: Real}
     Energy = 0.;
     @inbounds for i = 1:length(x)
         Delta_x, Delta_y, Delta_z = rx - x[i], ry - y[i], rz - z[i];
@@ -296,16 +296,20 @@ function Energy_Calculation(L::Float64, rx::Float64, ry::Float64, rz::Float64, x
     return Energy
 end
 
-function PeriodicBoundaryConditions!(L::Float64, x::Float64)
+function PeriodicBoundaryConditions!(L::Type, x::Float64) where {Type <: Real}
     return x - L * round(x / L)
 end
 
-function U(r::Float64, σ::Float64 = 1.0, λ::Float64 = 1.5, e::Float64 = 1.)
+function U(r::Float64, σ::Type = 1., λ::Type = 1.5, e::Type = 1.) where {Type <: Real}
     r <= σ ? (return Inf) : r <= λ ? (return -e) : (return 0)
 end
 
-function Random_Excluded_Volume(Equilibrium::Bool, σ::Float64, L::Float64, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1})
+function Random_Excluded_Volume(Equilibrium::Bool, σ::Type, L::Type, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}) where {Type <: Real}
     Equilibrium ? N_Random = 200 : N_Random = 1000
+    if !haskey(Pc, length(x))
+        Equilibrium = false;
+        N_Random = 1000;
+    end
     N_in = 0;
     x_Insertion, y_Insertion, z_Insertion = Float64[], Float64[], Float64[];
     if length(x) == 1
@@ -350,7 +354,7 @@ function Random_Excluded_Volume(Equilibrium::Bool, σ::Float64, L::Float64, Pc::
     return Pc, Pc_Sum, Pc_N, x_Insertion, y_Insertion, z_Insertion
 end
 
-function Interpolation(Pc::Dict{Int64, Float64}, l::Float64)
+function Interpolation(Pc::Dict{Int64, Float64}, l::Type) where {Type <: Real}
     if length(Pc) == 1
         Pc_Interpolation = collect(keys(Pc))[1];
     elseif length(Pc) > 1
@@ -376,7 +380,7 @@ function Interpolation(Pc::Dict{Int64, Float64}, l::Float64)
     return Pc_Interpolation
 end
 
-function RadialDistributionFunction(N_Bins::Int64, L::Float64, Density::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Float64 = 3.0)
+function RadialDistributionFunction(N_Bins::Int64, L::Type, Density::Float64, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}, R_Cut::Type = 3.) where {Type <: Real}
     Delta = R_Cut / N_Bins;
     g_r = zeros(Float64, N_Bins);
     @inbounds for i = 1:length(x) - 1, j = i + 1:length(x)
@@ -396,4 +400,4 @@ function RadialDistributionFunction(N_Bins::Int64, L::Float64, Density::Float64,
     return g_r
 end
 
-GrandCanonical_MonteCarlo(parse(Float64, ARGS[1]), parse(Float64, ARGS[2]))
+@time GrandCanonical_MonteCarlo(parse(Float64, ARGS[1]), parse(Float64, ARGS[2]))
