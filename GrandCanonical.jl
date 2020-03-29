@@ -304,6 +304,10 @@ function U(r::Float64, σ::Type = 1., λ::Type = 1.5, e::Type = 1.) where {Type 
     r <= σ ? (return Inf) : r <= λ ? (return -e) : (return 0)
 end
 
+function U_LJ(r::Float64, σ::Type = 1., e::Type = 1.) where {Type <: Real}
+    return 4e * (r^(-12.) - r^(-6))
+end
+
 function Random_Excluded_Volume(Equilibrium::Bool, σ::Type, L::Type, Pc::Dict{Int64, Float64}, Pc_Sum::Dict{Int64, Float64}, Pc_N::Dict{Int64, Int64}, x::Array{Float64, 1}, y::Array{Float64, 1}, z::Array{Float64, 1}) where {Type <: Real}
     Equilibrium ? N_Random = 200 : N_Random = 1000
     if !haskey(Pc, length(x))
