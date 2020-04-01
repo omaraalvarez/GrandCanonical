@@ -5,6 +5,22 @@ using Test;
 using LaTeXStrings;
 using StatsPlots;
 using Distributions;
+using ArgParse;
+
+function Parse_Commandline()
+    s = ArgParseSettings()
+    @add_arg_table! s begin
+        "μ"
+            help = "Chemical Potental";
+            arg_type = Float64;
+            required = true;
+        "T"
+            help = "Temperature";
+            arg_type = Float64;
+            required = true;
+    end
+    return parse_args(s)
+end
 
 function GrandCanonical_MonteCarlo(μ::Type, T::Type, R_Cut::Type = 3.) where {Type <: Real}
     ##################################### CONFIGURATIONAL STEPS #############################
@@ -120,9 +136,9 @@ function GrandCanonical_MonteCarlo(μ::Type, T::Type, R_Cut::Type = 3.) where {T
                 end
                 g_r += RadialDistributionFunction(N_Bins, L, length(x) / V, x, y, z)
             end
-            1. * N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
-            Displacement < 0.05 ? Displacement = 0.05 : nothing
-            Displacement > L / 4. ? Displacement = L / 4. : nothing
+            N_Displacement_Accepted / N_Displacement > 0.55 ? Displacement *= 1.05 : Displacement *= 0.95
+            Displacement < 0.05 ? Displacement = 0.05 : (Displacement > L / 4. ? Displacement = L / 4. : nothing)
+            
 
         end  
     end
@@ -404,4 +420,9 @@ function RadialDistributionFunction(N_Bins::Int64, L::Type, Density::Float64, x:
     return g_r
 end
 
-@time GrandCanonical_MonteCarlo(parse(Float64, ARGS[1]), parse(Float64, ARGS[2]))
+Args = Parse_Commandline()
+println("Parsed args:")
+for (arg,val) in Args
+    println("  $arg  =>  $val")
+end
+@time GrandCanonical_MonteCarlo(Args["μ"], Args["T"])
