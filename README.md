@@ -10,9 +10,17 @@ New states are generated either by insertion, removal or displacement of molecul
 
 Code has been designed with succesful parameters as compared with official reported results. This includes a 20σ ✕ 20σ ✕ 20σ simulation box with 2 ✕ ⌈ 0.5 ✕ V ⌉ ✕ 10E4 relaxation steps and 2.5 ✕ ⌈ 0.5 ✕ V ⌉ ✕ 10E5 equilibrium steps, for a total of 25,000 samples.
 
-A simple and semi-interactive execution has been designed for those not familiar with the Julia language, where the chemical potential and temperature are taken as parameters, i. e., a system with μ* = -4.151 and T* = 1.5:
+Execution is straightforward by parsing arguments:
 
-    julia GrandCanonical.jl -4.151 1.5
+    julia GrandCanonical.jl -h
+    usage: GrandCanonical.jl [-h] μ T
+
+    positional arguments:
+        μ           Chemical Potental (type: Float64)
+        T           Temperature (type: Float64)
+
+    optional arguments:
+        -h, --help  show this help message and exit
 
 This generates output files with the energy, density and radial distribution function evolution of the system along the simulation, as well as their corresponding plots.
 
